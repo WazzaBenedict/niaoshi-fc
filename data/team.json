@@ -1,0 +1,50 @@
+{
+  "name": "台南鳥仕足球俱樂部",
+  "short": "鳥仕",
+  "season": "2026/27",
+  "league": "D LEAGUE 台南夢達七人足球聯賽 L3",
+  "formation": "3-2-1（防反）",
+  "halfLength": 20,
+  "links": {
+    "team": "https://dreamsportfootball.github.io/d-league/teams/tainan-niaoshi-fc?season=2026-27",
+    "standings": "https://dreamsportfootball.github.io/d-league/standings/?season=2026-27&league=L3",
+    "stats": "https://dreamsportfootball.github.io/d-league/stats/?season=2026-27&league=L3",
+    "youtube": "https://www.youtube.com/@dleague.tainan",
+    "rules": "https://drive.google.com/file/d/1MIe3p4ielXLnJSnr_V8YNCFpvonlxxS4/view?usp=drive_link"
+  },
+  "staff": [
+    { "role": "領隊／教練", "name": "王志誠" },
+    { "role": "管理", "name": "許御力" }
+  ],
+  "players": [
+    { "no": 6, "name": "吳昱陞" },
+    { "no": 10, "name": "許御力" },
+    { "no": 11, "name": "魏嘉成" },
+    { "no": 14, "name": "王志誠" },
+    { "no": 16, "name": "蘇智龍" },
+    { "no": 17, "name": "楊傑儒" },
+    { "no": 18, "name": "談宏智" },
+    { "no": 19, "name": "郭奕辰" },
+    { "no": 20, "name": "于克偉" },
+    { "no": 25, "name": "王竣弘" },
+    { "no": 30, "name": "陳學璋" },
+    { "no": 42, "name": "黃首駿" },
+    { "no": 44, "name": "林宏懋" },
+    { "no": 64, "name": "薛易昀" },
+    { "no": 76, "name": "鄭祖鏗" },
+    { "no": 88, "name": "許漢權" },
+    { "no": 99, "name": "于克元" }
+  ],
+  "standings": {
+    "asOf": "2026-11-22",
+    "afterRound": 2,
+    "rows": [
+      { "team": "SF足球俱樂部", "p": 2, "gd": 14, "pts": 6 },
+      { "team": "台南鳥仕足球俱樂部", "p": 2, "gd": 1, "pts": 3 },
+      { "team": "聖騎士足球俱樂部", "p": 2, "gd": -2, "pts": 3 },
+      { "team": "鹿逐俱樂部", "p": 2, "gd": 0, "pts": 2 },
+      { "team": "WANDERERS", "p": 2, "gd": -2, "pts": 1 },
+      { "team": "屏東野狼足球俱樂部", "p": 2, "gd": -11, "pts": 1 }
+    ]
+  }
+}
