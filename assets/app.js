@@ -189,9 +189,6 @@
         <line x1="${padX}" x2="${W - padX}" y1="${H - padB}" y2="${H - padB}" class="base"/>
         ${bars}
       </svg>
-      <details class="tbl"><summary>表格 ▾</summary><table><thead><tr><th>時段</th><th>進球</th><th>失球</th></tr></thead><tbody>
-        ${WINDOWS.map((w, i) => `<tr><td>${w}</td><td>${s.win[0][i]}</td><td>${s.win[1][i]}</td></tr>`).join('')}
-      </tbody></table></details>
     </figure>`;
   }
 
@@ -258,7 +255,7 @@
         <div>
           <span class="kicker">${esc(D.team.season)} · D LEAGUE L3</span>
           <h1>${esc(D.team.name)}</h1>
-          <div class="sub"><span class="pill gold">${esc(D.team.formation)}</span><span>${esc(D.team.league)}</span></div>
+          <div class="sub"><span>${esc(D.team.league)}</span></div>
           <div class="form">${form}${next ? '<a class="U" title="下一場">?</a>' : ''}</div>
         </div>
         <div class="stats">
@@ -284,22 +281,21 @@
           ${windowChart(s)}
         </section>
         <section class="card c4">
-          ${head('Key insight', '失球集中')}
+          ${head('Conceded', '失球分布')}
           <div class="tiles">
-            <div class="tile"><div class="v num">${sh}<small>/${s.ga}</small></div><div class="k">下半場失球</div><div class="meter"><i class="grow-x" style="width:${s.ga ? sh / s.ga * 100 : 0}%"></i></div></div>
-            <div class="tile"><div class="v num">${l10}<small>/${s.ga}</small></div><div class="k">31'–40' 失球</div><div class="meter"><i class="grow-x" style="width:${s.ga ? l10 / s.ga * 100 : 0}%;--d:1"></i></div></div>
+            <div class="tile"><div class="v num">${sh}<small>/${s.ga}</small></div><div class="k">下半場</div><div class="meter"><i class="grow-x" style="width:${s.ga ? sh / s.ga * 100 : 0}%"></i></div></div>
+            <div class="tile"><div class="v num">${l10}<small>/${s.ga}</small></div><div class="k">最後 10 分鐘</div><div class="meter"><i class="grow-x" style="width:${s.ga ? l10 / s.ga * 100 : 0}%;--d:1"></i></div></div>
           </div>
         </section>
       </div>
 
       <div class="grid">
         <section class="card c6">
-          ${head('Conceded', '失球原因', `${s.conceded.filter(x => x.e.cause && x.e.cause.length).length}/${s.conceded.length} 已標記`)}
+          ${head('Analysis', '失球原因')}
           ${hbar(causes, '尚未標記')}
-          ${Object.keys(s.causesTentative).length ? '<p class="small muted" style="margin:10px 0 0">淡色為初判</p>' : ''}
         </section>
         <section class="card c6">
-          ${head('Game state', '失球當下比分')}
+          ${head('Game state', '失球時比分')}
           ${hbar([{ k: '領先', v: cs.lead }, { k: '平手', v: cs.draw }, { k: '落後', v: cs.trail }])}
         </section>
       </div>
@@ -307,7 +303,7 @@
       <div class="grid">
         <section class="card c5">
           ${head('Top scorers', '射手榜')}
-          ${scorers.length ? `<ol class="rank">${scorers.map(([n, v], i) => { const p = player(n); return `<li><span class="pos">${i + 1}</span><span class="shirt">${esc(n)}</span><span class="nm">${esc(pname(n))}${p && p.pos ? `<small>${esc(p.pos)}</small>` : ''}</span><span class="g">${v}</span></li>`; }).join('')}</ol>` : '<p class="empty">—</p>'}
+          ${scorers.length ? `<ol class="rank">${scorers.map(([n, v], i) => { const p = player(n); return `<li><span class="pos">${i + 1}</span><span class="shirt">${esc(n)}</span><span class="nm">${esc(pname(n))}</span><span class="g">${v}</span></li>`; }).join('')}</ol>` : '<p class="empty">—</p>'}
         </section>
         <section class="card c7">
           ${head('Standings', '積分榜', `第 ${st.afterRound} 輪 · <a href="${D.team.links.standings}" target="_blank" rel="noopener">官網 ↗</a>`)}
@@ -491,7 +487,7 @@
       box.innerHTML = `${frames.length > 1 ? `<div class="frames">${frames.map((f, i) => `<button type="button" class="chip ${i === idx ? 'on' : ''}" data-i="${i}">${i + 1} · ${esc(f.label || '')}</button>`).join('')}</div>` : (frames[0].label ? `<div class="frames"><span class="chip on">${esc(frames[0].label)}</span></div>` : '')}
         <div class="pitch-wrap"></div>
         ${legendPitch()}
-        ${diagram.note ? `<p class="board-note">${esc(diagram.note)}</p>` : ''}`;
+        `;
       Pitch.render(box.querySelector('.pitch-wrap'), frames[idx], { label: frames[idx].label });
       box.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { idx = +b.dataset.i; draw(); });
     };
@@ -527,7 +523,7 @@
       const cell = (r, c) => {
         const v = r[c];
         if (c === 'no') return `<td class="num" style="color:var(--gold);font-weight:700">${v}</td>`;
-        if (c === 'name') return `<td>${esc(v)}${r.pos ? `<span class="sub">${esc(r.pos)}</span>` : ''}</td>`;
+        if (c === 'name') return `<td>${esc(v)}</td>`;
         if (c === 'acc') return `<td class="n">${v >= 0 ? Math.round(v * 100) + '%' : '<span class="muted">–</span>'}</td>`;
         if (['gf', 'ga', 'pm', 'mins', 'apps'].includes(c) && !r.apps) return `<td class="n muted">–</td>`;
         if (c === 'pm') return `<td class="n ${v > 0 ? 'pos' : v < 0 ? 'neg' : ''}">${v > 0 ? '+' : ''}${v}</td>`;
@@ -543,9 +539,8 @@
     };
     const v = view(`${draftBanner()}
       <section class="card">
-        ${head('Squad 2026/27', '球員數據', `${D.team.players.length} 人`)}
+        ${head('Squad 2026/27', '球員數據')}
         <div class="scroll"><table class="t sticky" id="ptbl"></table></div>
-        <p class="small muted" style="margin:12px 0 0">出場／分鐘／在場進失：${s.lineupMatches} 場有完整換人紀錄 · 傳球／攔截：${s.psMatches} 場</p>
       </section>
       <section class="card">${head('Staff', '職員')}
         <div style="display:flex;gap:24px;flex-wrap:wrap">${D.team.staff.map(x => `<div><span class="kicker">${esc(x.role)}</span><b>${esc(x.name)}</b></div>`).join('')}</div>
