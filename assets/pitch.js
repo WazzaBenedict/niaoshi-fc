@@ -34,8 +34,8 @@
       el('circle', { cx: W / 2, cy: y0 + dir * 10, r: 0.6, class: 'pf-dot' }, g);
       el('rect', { x: (W - goalW) / 2, y: dir === 1 ? y0 - 1.6 : y0, width: goalW, height: 1.6, class: 'pf-goal' }, g);
     });
-    const t1 = el('text', { x: W / 2, y: -1.6, class: 'pf-caption' }, svg); t1.textContent = '↑ 對方球門（進攻方向）';
-    const t2 = el('text', { x: W / 2, y: H + 3.4, class: 'pf-caption' }, svg); t2.textContent = '鳥仕球門';
+    const t1 = el('text', { x: W / 2, y: -1.6, class: 'pf-caption' }, svg); t1.textContent = '進攻方向 ↑';
+    const t2 = el('text', { x: W / 2, y: H + 3.4, class: 'pf-caption' }, svg); t2.textContent = '鳥仕';
   }
 
   function defs(svg, id) {
@@ -127,7 +127,7 @@
         bar.appendChild(b);
       });
       const add = document.createElement('button');
-      add.type = 'button'; add.className = 'chip ghost'; add.textContent = '＋ 複製成下一格';
+      add.type = 'button'; add.className = 'chip ghost'; add.textContent = '＋ 下一格';
       add.onclick = () => {
         const copy = JSON.parse(JSON.stringify(cur()));
         copy.label = `畫面 ${diagram.frames.length + 1}`;
@@ -137,7 +137,7 @@
       bar.appendChild(add);
       if (diagram.frames.length > 1) {
         const del = document.createElement('button');
-        del.type = 'button'; del.className = 'chip ghost danger'; del.textContent = '刪除此格';
+        del.type = 'button'; del.className = 'chip ghost danger'; del.textContent = '刪除';
         del.onclick = () => { diagram.frames.splice(state.frame, 1); state.frame = Math.max(0, state.frame - 1); changed(); };
         bar.appendChild(del);
       }
@@ -145,7 +145,7 @@
 
     function renderTools() {
       tools.innerHTML = `
-        <label class="pe-field">這一格叫做 <input class="pe-label" value="${(cur().label || '').replace(/"/g, '&quot;')}" placeholder="例：對方傳身後球前"></label>
+        <label class="pe-field">標題 <input class="pe-label" value="${(cur().label || '').replace(/"/g, '&quot;')}" placeholder="例：傳身後球前"></label>
         <div class="seg" role="group" aria-label="模式">
           <button type="button" data-mode="move">拖曳球員</button>
           <button type="button" data-mode="arrow">畫箭頭</button>
@@ -164,7 +164,7 @@
         <div class="pe-row">
           <button type="button" class="btn small" data-act="addThem">＋ 對手</button>
           <button type="button" class="btn small" data-act="rmThem">－ 對手</button>
-          <button type="button" class="btn small" data-act="resetUs">鳥仕回 3-2-1</button>
+          <button type="button" class="btn small" data-act="resetUs">重設 3-2-1</button>
         </div>`;
       tools.querySelector('.pe-label').oninput = e => { cur().label = e.target.value; renderBar(); onChange(diagram); };
       tools.querySelectorAll('[data-mode]').forEach(b => {
@@ -191,9 +191,9 @@
         changed();
       };
       hint.textContent = {
-        move: '按住球員或球拖曳到位置。點一下鳥仕球員可以改背號。',
-        arrow: '在球場上按「起點」再按「終點」畫一條箭頭。',
-        erase: '點一下箭頭就會刪除。'
+        move: '拖曳移動 · 點一下改背號',
+        arrow: '點起點，再點終點',
+        erase: '點箭頭刪除'
       }[state.mode];
     }
 

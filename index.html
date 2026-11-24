@@ -3,27 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>鳥仕足球隊 數據分析</title>
-  <meta name="description" content="台南鳥仕足球俱樂部 D LEAGUE L3 比賽數據、失球分析與 2D 站位圖">
-  <meta name="theme-color" content="#00918f">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23fff' stroke='%2300918f' stroke-width='3'/%3E%3Cpath d='M16 9l6 4.5-2.3 7h-7.4L10 13.5z' fill='%2300918f'/%3E%3C/svg%3E">
+  <title>鳥仕 FC · Match Centre</title>
+  <meta name="description" content="台南鳥仕足球俱樂部 D LEAGUE L3 比賽數據與戰術分析">
+  <meta name="theme-color" content="#0c1113" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f3f5f4" media="(prefers-color-scheme: light)">
+  <link rel="apple-touch-icon" href="assets/logo-180.png">
+  <link rel="icon" type="image/png" href="assets/logo-64.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#/"><span class="logo" aria-hidden="true"></span>鳥仕 FC</a>
-    <nav class="topnav" aria-label="主選單">
-      <a href="#/">總覽</a>
-      <a href="#/matches">比賽</a>
-      <a href="#/players">球員</a>
-      <a href="#/board">戰術板</a>
-      <a href="#/log">紀錄</a>
-    </nav>
+    <div class="topbar-in">
+      <a class="brand" href="#/">
+        <img src="assets/logo-64.png" alt="" width="36" height="36">
+        <span><b>鳥仕 FC</b><small>MATCH CENTRE</small></span>
+      </a>
+      <nav class="nav" aria-label="主選單">
+        <a href="#/" data-nav="home"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span>總覽</span></a>
+        <a href="#/matches" data-nav="matches"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><span>比賽</span></a>
+        <a href="#/players" data-nav="players"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.8 3.6-6 7-6s6.2 2.2 7 6"/></svg><span>球員</span></a>
+        <a href="#/board" data-nav="board"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 12h16"/><circle cx="12" cy="12" r="2.5"/></svg><span>戰術板</span></a>
+        <a href="#/log" data-nav="log"><svg viewBox="0 0 24 24"><path d="M5 19l1-4 10-10 3 3-10 10z"/><path d="M14 7l3 3"/></svg><span>紀錄</span></a>
+      </nav>
+    </div>
   </header>
-  <main id="app" class="wrap"><p class="muted">載入中…</p></main>
-  <footer class="wrap foot muted small">
-    資料來源：D LEAGUE 官方賽事紀錄與比賽影片。站位圖與失球原因由球隊自行標記。
-  </footer>
+  <main id="app" class="wrap"><div class="loader" aria-label="載入中"></div></main>
+  <footer class="foot wrap">鳥仕 FC · D LEAGUE 2026/27 · 資料：D LEAGUE 官方紀錄</footer>
   <script src="assets/pitch.js"></script>
   <script src="assets/app.js"></script>
 </body>

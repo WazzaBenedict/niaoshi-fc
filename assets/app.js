@@ -15,7 +15,6 @@
 
   // ---------- 工具 ----------
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const h = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content; };
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch {} },
@@ -125,66 +124,98 @@
     return s;
   }
 
+
+  // ---------- 小元件 ----------
+  const ICON = {
+    goal: '<svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 4.6l2.6 1.9-1 3H6.4l-1-3z" fill="currentColor"/></svg>',
+    sub: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 6h8l-2.5-2.5M12 10H4l2.5 2.5"/></svg>',
+    card: c => `<svg class="ico" viewBox="0 0 16 16"><rect x="4.5" y="2.5" width="7" height="11" rx="1.2" fill="${c === 'red' ? '#e5483b' : '#f5c518'}"/></svg>`,
+    play: '<svg class="ico" viewBox="0 0 16 16"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg>'
+  };
+  const head = (kicker, title, aside = '') => `<div class="head"><div><span class="kicker">${kicker}</span><h2>${title}</h2></div>${aside ? `<div class="aside">${aside}</div>` : ''}</div>`;
+  const resBadge = r => `<i class="${r}">${r === 'W' ? '勝' : r === 'L' ? '負' : '和'}</i>`;
+  const stagger = root => [...root.children].forEach((c, i) => c.style.setProperty('--i', Math.min(i, 10)));
+  const daysTo = d => Math.ceil((new Date(d + 'T00:00:00+08:00') - Date.now()) / 86400000);
+
+  function countUp(root) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    root.querySelectorAll('[data-count]').forEach(el => {
+      const end = +el.dataset.count, pre = el.dataset.pre || '', t0 = performance.now(), dur = 700;
+      if (!end) return;
+      const step = t => {
+        const p = Math.min(1, (t - t0) / dur), v = Math.round(end * (1 - Math.pow(1 - p, 3)));
+        el.textContent = pre + v;
+        if (p < 1) requestAnimationFrame(step);
+      };
+      el.textContent = pre + '0';
+      setTimeout(() => requestAnimationFrame(step), 200);
+    });
+  }
+
+  function view(html) {
+    app.innerHTML = `<div class="view">${html}</div>`;
+    const v = app.firstElementChild;
+    stagger(v);
+    countUp(v);
+    bindCommon();
+    return v;
+  }
+
   // ---------- 圖表 ----------
   function windowChart(s) {
     const max = Math.max(1, ...s.win[0], ...s.win[1]);
-    const W = 320, H = 180, padL = 8, padB = 30, padT = 30, gw = (W - padL * 2) / 4, bw = 22;
+    const W = 340, H = 190, padX = 6, padB = 28, padT = 26, gw = (W - padX * 2) / 4, bw = 24;
     const y = v => H - padB - (v / max) * (H - padB - padT);
-    let bars = '';
+    let bars = '', d = 0;
     for (let i = 0; i < 4; i++) {
-      const cx = padL + gw * i + gw / 2;
+      const cx = padX + gw * i + gw / 2;
       [0, 1].forEach(side => {
         const v = s.win[side][i];
-        const x = cx + (side === 0 ? -bw - 1 : 1);
-        const top = y(v), hgt = H - padB - top;
-        const label = side === 0 ? '進球' : '失球';
-        bars += `<g class="bar-g"><title>${WINDOWS[i]} ${label} ${v}</title>
-          <rect x="${x - 3}" y="${padT - 4}" width="${bw + 6}" height="${H - padB - padT + 4}" class="hit"/>
-          ${v > 0 ? `<path d="M${x},${H - padB} V${top + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${H - padB} z" class="bar s${side}"/>` : ''}
-          <text x="${x + bw / 2}" y="${top - 5}" class="v">${v}</text></g>`;
+        const x = cx + (side === 0 ? -bw - 2 : 2);
+        const top = y(v);
+        bars += `<g class="bar-g"><title>${WINDOWS[i]} ${side === 0 ? '進球' : '失球'} ${v}</title>
+          <rect x="${x - 2}" y="${padT}" width="${bw + 4}" height="${H - padB - padT}" class="hit"/>
+          ${v > 0 ? `<path d="M${x},${H - padB} V${top + 5} q0,-5 5,-5 h${bw - 10} q5,0 5,5 V${H - padB} z" class="bar s${side} grow-y" style="--d:${d++}"/>` : ''}
+          <text x="${x + bw / 2}" y="${top - 7}" class="v fade-in" style="--d:${d}">${v}</text></g>`;
       });
-      bars += `<text x="${cx}" y="${H - padB + 17}" class="ax">${WINDOWS[i]}</text>`;
+      bars += `<text x="${cx}" y="${H - padB + 18}" class="ax">${WINDOWS[i]}</text>`;
     }
-    const half = (W) / 2;
-    return `<figure class="chart">
-      <div class="legend"><span><i class="sw s0"></i>鳥仕進球</span><span><i class="sw s1"></i>失球</span></div>
+    const mid = W / 2;
+    return `<figure class="chart" style="margin:0">
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="進失球時段分布">
-        <line x1="${padL}" x2="${W - padL}" y1="${H - padB}" y2="${H - padB}" class="base"/>
-        <line x1="${half}" x2="${half}" y1="${padT - 6}" y2="${H - padB + 4}" class="divider"/>
-        <text x="${half - 4}" y="${padT - 8}" class="ax end">上半場</text><text x="${half + 4}" y="${padT - 8}" class="ax start">下半場</text>
+        <rect x="${mid}" y="${padT - 18}" width="${W / 2 - padX + 2}" height="${H - padB - padT + 18}" rx="8" class="half-bg"/>
+        <text x="${padX + 4}" y="${padT - 6}" class="ax start">上半場</text>
+        <text x="${mid + 8}" y="${padT - 6}" class="ax start">下半場</text>
+        <line x1="${padX}" x2="${W - padX}" y1="${H - padB}" y2="${H - padB}" class="base"/>
         ${bars}
       </svg>
-      <details class="tbl"><summary>表格</summary><table><thead><tr><th>時段</th><th>進球</th><th>失球</th></tr></thead><tbody>
+      <details class="tbl"><summary>表格 ▾</summary><table><thead><tr><th>時段</th><th>進球</th><th>失球</th></tr></thead><tbody>
         ${WINDOWS.map((w, i) => `<tr><td>${w}</td><td>${s.win[0][i]}</td><td>${s.win[1][i]}</td></tr>`).join('')}
       </tbody></table></details>
     </figure>`;
   }
 
-  function hbar(rows, opts = {}) {
-    if (!rows.length) return `<p class="muted">${opts.empty || '尚無資料'}</p>`;
+  function hbar(rows, empty = '—') {
+    if (!rows.length) return `<p class="empty">${empty}</p>`;
     const max = Math.max(...rows.map(r => r.v + (r.t || 0)), 1);
-    return `<div class="hbars">${rows.map(r => `
-      <div class="hb-row" title="${esc(r.k)}：${r.v}${r.t ? `（另 ${r.t} 為初判）` : ''}">
+    return `<div class="hbars">${rows.map((r, i) => `
+      <div class="hb-row" title="${esc(r.k)} ${r.v + (r.t || 0)}${r.t ? `（${r.t} 初判）` : ''}">
         <span class="hb-k">${esc(r.k)}</span>
-        <span class="hb-track"><span class="hb-fill" style="width:${(r.v / max) * 100}%"></span>${r.t ? `<span class="hb-fill tentative" style="width:${(r.t / max) * 100}%"></span>` : ''}</span>
+        <span class="hb-track">${r.v ? `<span class="hb-fill grow-x" style="width:${(r.v / max) * 100}%;--d:${i}"></span>` : ''}${r.t ? `<span class="hb-fill tentative grow-x" style="width:${(r.t / max) * 100}%;--d:${i}"></span>` : ''}</span>
         <span class="hb-v">${r.v + (r.t || 0)}</span>
       </div>`).join('')}</div>`;
   }
 
-  // ---------- 版面 ----------
-  function nav(active) {
-    const items = [['#/', '總覽'], ['#/matches', '比賽'], ['#/players', '球員'], ['#/board', '戰術板'], ['#/log', '紀錄']];
-    document.querySelectorAll('.topnav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === active));
-    return items;
+  // ---------- 共用 ----------
+  function nav(key) {
+    document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === key));
   }
 
   function draftBanner() {
     if (!D.draft) return '';
     const preview = store.sget(PREVIEW_KEY) === '1';
-    return `<div class="banner ${preview ? 'on' : ''}">
-      ${preview ? '正在預覽你在這台裝置上的<strong>草稿</strong>（隊友看不到）。' : '這台裝置有尚未發佈的紀錄草稿。'}
-      <button class="btn small" data-act="toggle-preview">${preview ? '回到正式版' : '預覽草稿'}</button>
-    </div>`;
+    return `<div class="banner"><span>${preview ? '草稿預覽中' : '本機有未發佈的草稿'}</span>
+      <button class="btn small ghost" data-act="toggle-preview">${preview ? '回到正式版' : '預覽'}</button></div>`;
   }
 
   function bindCommon() {
@@ -193,179 +224,241 @@
     });
   }
 
-  // ---------- 頁面：總覽 ----------
+  function fixtures(list) {
+    return `<ul class="fx">${list.map(m => {
+      const played = m.status === 'played';
+      const sc = played ? scoreOf(m) : null;
+      return `<li><a href="#/m/${m.id}">
+        <span class="rd">R${m.round}</span>
+        <span class="op">${esc(m.opponent)}<small>${m.home ? '主場' : '客場'} · ${fmtDate(m.date, m.time)}</small></span>
+        ${played ? `<span class="res">${sc.us}–${sc.them} ${resBadge(resultOf(sc))}</span>` : `<span class="res up">${fmtDate(m.date)}</span>`}
+      </a></li>`;
+    }).join('')}</ul>`;
+  }
+
+  // ---------- 總覽 ----------
   function pageHome() {
-    nav('#/');
+    nav('home');
     const list = matches();
     const s = seasonStats(list);
     const next = list.find(m => m.status !== 'played');
     const st = D.team.standings;
     const rank = st.rows.findIndex(r => r.team === D.team.name) + 1;
-    const pts = s.w * 3 + s.d;
-    const lastTen = s.win[1][3];
-    const secondHalf = s.halves.them[1];
+    const pts = s.w * 3 + s.d, gd = s.gf - s.ga;
     const scorers = Object.entries(s.scorers).sort((a, b) => b[1] - a[1]);
     const causes = Object.keys({ ...s.causes, ...s.causesTentative }).map(k => ({ k, v: s.causes[k] || 0, t: s.causesTentative[k] || 0 })).sort((a, b) => (b.v + b.t) - (a.v + a.t));
     const cs = s.concededState;
-    const withDiagram = s.conceded.filter(x => x.e.diagram && x.e.diagram.frames && x.e.diagram.frames.length).length;
+    const sh = s.halves.them[1], l10 = s.win[1][3];
+    const form = list.map(m => m.status === 'played' ? `<a class="${resultOf(scoreOf(m))}" href="#/m/${m.id}" title="R${m.round} ${esc(m.opponent)}">${resultOf(scoreOf(m)) === 'W' ? '勝' : resultOf(scoreOf(m)) === 'L' ? '負' : '和'}</a>` : '').join('');
+    const dn = next ? daysTo(next.date) : 0;
 
-    app.innerHTML = `${draftBanner()}
+    view(`${draftBanner()}
       <section class="hero">
+        <img class="logo" src="assets/logo.webp" alt="鳥仕 FC">
         <div>
-          <p class="eyebrow">${esc(D.team.season)} · ${esc(D.team.league)}</p>
+          <span class="kicker">${esc(D.team.season)} · D LEAGUE L3</span>
           <h1>${esc(D.team.name)}</h1>
-          <p class="muted">主要陣式 ${esc(D.team.formation)}</p>
+          <div class="sub"><span class="pill gold">${esc(D.team.formation)}</span><span>${esc(D.team.league)}</span></div>
+          <div class="form">${form}${next ? '<a class="U" title="下一場">?</a>' : ''}</div>
         </div>
-        <div class="kpis">
-          <div class="kpi"><b>${s.w}-${s.d}-${s.l}</b><span>勝-和-負</span></div>
-          <div class="kpi"><b>${pts}</b><span>積分</span></div>
-          <div class="kpi"><b>${s.gf}:${s.ga}</b><span>進:失</span></div>
-          <div class="kpi"><b>${rank ? '#' + rank : '–'}</b><span>排名（第 ${st.afterRound} 輪後）</span></div>
+        <div class="stats">
+          <div class="stat"><b class="gold" data-count="${rank}" data-pre="#">#${rank || '–'}</b><span>排名</span></div>
+          <div class="stat"><b data-count="${pts}">${pts}</b><span>積分</span></div>
+          <div class="stat"><b>${s.w}-${s.d}-${s.l}</b><span>勝-和-負</span></div>
+          <div class="stat"><b data-count="${s.gf}">${s.gf}</b><span>進球</span></div>
+          <div class="stat"><b data-count="${s.ga}">${s.ga}</b><span>失球</span></div>
+          <div class="stat"><b>${gd > 0 ? '+' : ''}${gd}</b><span>淨勝</span></div>
         </div>
       </section>
 
       ${next ? `<a class="card next" href="#/m/${next.id}">
-        <span class="eyebrow">下一場 · 第 ${next.round} 輪</span>
-        <strong>${next.home ? '主場' : '客場'} 對 ${esc(next.opponent)}</strong>
-        <span class="muted">${fmtDate(next.date, next.time)}</span>
+        <div><span class="kicker">Next · 第 ${next.round} 輪</span>
+          <h3>${next.home ? '主場' : '客場'} vs ${esc(next.opponent)}</h3>
+          <div class="when">${fmtDate(next.date, next.time)}</div></div>
+        <div class="countdown"><b>${dn > 0 ? dn : dn === 0 ? '今天' : '—'}</b><span>${dn > 0 ? '天後' : ''}</span></div>
       </a>` : ''}
 
-      <section class="card">
-        <h2>什麼時候進球、什麼時候失球</h2>
-        <p class="lead">${s.ga ? `${s.ga} 個失球中有 <strong>${secondHalf} 個在下半場</strong>，${lastTen} 個在最後 10 分鐘。` : '還沒有失球紀錄。'}${s.gf ? ` 進球集中在 ${WINDOWS[s.win[0].indexOf(Math.max(...s.win[0]))]}。` : ''}</p>
-        ${windowChart(s)}
-      </section>
-
-      <div class="grid2">
-        <section class="card">
-          <h2>失球原因</h2>
-          ${hbar(causes, { empty: '失球還沒有標記原因。到「紀錄」頁替每個失球選原因、畫站位圖。' })}
-          ${Object.keys(s.causesTentative).length ? '<p class="muted small"><i class="sw s1 tentative"></i>淡色＝依影片初判，尚未逐格確認</p>' : ''}
-          <p class="muted small">${s.conceded.length} 個失球中，${s.conceded.length - s.conceded.filter(x => x.e.cause && x.e.cause.length).length} 個還沒標原因，${withDiagram} 個有站位圖。</p>
+      <div class="grid">
+        <section class="card c8">
+          ${head('Goal timing', '進失球時段', `<span class="legend"><span><i class="sw s0"></i>進球</span><span><i class="sw s1"></i>失球</span></span>`)}
+          ${windowChart(s)}
         </section>
-        <section class="card">
-          <h2>失球當下的比分</h2>
-          ${hbar([{ k: '領先時', v: cs.lead }, { k: '平手時', v: cs.draw }, { k: '落後時', v: cs.trail }])}
-          <p class="muted small">領先時失球多，通常代表領先後整隊退太深或專注力下降。</p>
+        <section class="card c4">
+          ${head('Key insight', '失球集中')}
+          <div class="tiles">
+            <div class="tile"><div class="v num">${sh}<small>/${s.ga}</small></div><div class="k">下半場失球</div><div class="meter"><i class="grow-x" style="width:${s.ga ? sh / s.ga * 100 : 0}%"></i></div></div>
+            <div class="tile"><div class="v num">${l10}<small>/${s.ga}</small></div><div class="k">31'–40' 失球</div><div class="meter"><i class="grow-x" style="width:${s.ga ? l10 / s.ga * 100 : 0}%;--d:1"></i></div></div>
+          </div>
         </section>
       </div>
 
-      <div class="grid2">
-        <section class="card">
-          <h2>射手榜</h2>
-          ${scorers.length ? `<ol class="rank">${scorers.map(([n, v]) => `<li><span>${esc(pLabel(n))}</span><b>${v}</b></li>`).join('')}</ol>` : '<p class="muted">尚無進球</p>'}
+      <div class="grid">
+        <section class="card c6">
+          ${head('Conceded', '失球原因', `${s.conceded.filter(x => x.e.cause && x.e.cause.length).length}/${s.conceded.length} 已標記`)}
+          ${hbar(causes, '尚未標記')}
+          ${Object.keys(s.causesTentative).length ? '<p class="small muted" style="margin:10px 0 0">淡色為初判</p>' : ''}
         </section>
-        <section class="card">
-          <h2>積分榜 <span class="muted small">（${st.asOf.replaceAll('-', '/')}，<a href="${D.team.links.standings}" target="_blank" rel="noopener">官網</a>）</span></h2>
-          <table class="tbl-std"><thead><tr><th>#</th><th>球隊</th><th>場</th><th>淨</th><th>分</th></tr></thead><tbody>
-            ${st.rows.map((r, i) => `<tr class="${r.team === D.team.name ? 'me' : ''}"><td>${i + 1}</td><td>${esc(r.team)}</td><td>${r.p}</td><td>${r.gd > 0 ? '+' : ''}${r.gd}</td><td><b>${r.pts}</b></td></tr>`).join('')}
+        <section class="card c6">
+          ${head('Game state', '失球當下比分')}
+          ${hbar([{ k: '領先', v: cs.lead }, { k: '平手', v: cs.draw }, { k: '落後', v: cs.trail }])}
+        </section>
+      </div>
+
+      <div class="grid">
+        <section class="card c5">
+          ${head('Top scorers', '射手榜')}
+          ${scorers.length ? `<ol class="rank">${scorers.map(([n, v], i) => { const p = player(n); return `<li><span class="pos">${i + 1}</span><span class="shirt">${esc(n)}</span><span class="nm">${esc(pname(n))}${p && p.pos ? `<small>${esc(p.pos)}</small>` : ''}</span><span class="g">${v}</span></li>`; }).join('')}</ol>` : '<p class="empty">—</p>'}
+        </section>
+        <section class="card c7">
+          ${head('Standings', '積分榜', `第 ${st.afterRound} 輪 · <a href="${D.team.links.standings}" target="_blank" rel="noopener">官網 ↗</a>`)}
+          <table class="t"><thead><tr><th>#</th><th>球隊</th><th class="n">場</th><th class="n">淨勝</th><th class="n">積分</th></tr></thead><tbody>
+            ${st.rows.map((r, i) => `<tr class="${r.team === D.team.name ? 'me' : ''}"><td>${i + 1}</td><td>${esc(r.team)}</td><td class="n">${r.p}</td><td class="n">${r.gd > 0 ? '+' : ''}${r.gd}</td><td class="n"><b>${r.pts}</b></td></tr>`).join('')}
           </tbody></table>
         </section>
       </div>
 
       <section class="card">
-        <h2>賽程與結果</h2>
-        ${matchList(list)}
-      </section>`;
-    bindCommon();
-  }
-
-  function matchList(list) {
-    return `<ul class="mlist">${list.map(m => {
-      const played = m.status === 'played';
-      const sc = played ? scoreOf(m) : null;
-      const r = sc ? resultOf(sc) : '';
-      return `<li><a href="#/m/${m.id}">
-        <span class="rd">R${m.round}</span>
-        <span class="mt"><strong>${m.home ? '主' : '客'} · ${esc(m.opponent)}</strong><span class="muted small">${fmtDate(m.date, m.time)}</span></span>
-        ${played ? `<span class="res r${r}">${r === 'W' ? '勝' : r === 'L' ? '負' : '和'} ${sc.us}-${sc.them}</span>` : '<span class="res">未賽</span>'}
-      </a></li>`;
-    }).join('')}</ul>`;
+        ${head('Fixtures', '賽程', `<a href="#/matches">全部 →</a>`)}
+        ${fixtures(list)}
+      </section>`);
   }
 
   function pageMatches() {
-    nav('#/matches');
-    app.innerHTML = `${draftBanner()}<section class="card"><h2>全部比賽</h2>${matchList(matches())}</section>`;
-    bindCommon();
+    nav('matches');
+    view(`${draftBanner()}<section class="card">${head('Season 2026/27', '賽程與賽果')}${fixtures(matches())}</section>`);
   }
 
-  // ---------- 頁面：單場 ----------
-  function pageMatch(id) {
-    nav('#/matches');
+  // ---------- 單場 ----------
+  function pageMatch(id, tab) {
+    nav('matches');
     const m = matches().find(x => x.id === id);
-    if (!m) { app.innerHTML = '<p>找不到這場比賽。</p>'; return; }
+    if (!m) { view('<p class="empty">找不到這場比賽</p>'); return; }
     const played = m.status === 'played';
     const sc = scoreOf(m);
-    const op = played ? onPitch(m) : null;
     const evs = sortEvents(m.events || []);
     const conceded = evs.filter(e => e.type === 'goal' && e.side === 'them');
     const rv = m.review || {};
-    let us = 0, them = 0;
+    const hasReview = ['observations', 'good', 'improve', 'plan'].some(k => rv[k] && rv[k].length);
+    const hasData = !!(m.playerStats && Object.keys(m.playerStats).length) || !!onPitch(m);
+    const tabs = [['sum', '概要']];
+    if (conceded.length) tabs.push(['goals', `失球分析<span class="cnt">${conceded.length}</span>`]);
+    if (m.lineup || hasData) tabs.push(['data', '陣容與數據']);
+    if (hasReview) tabs.push(['review', '檢討']);
+    if (!tabs.some(t => t[0] === tab)) tab = 'sum';
 
-    const evRow = e => {
+    const scorerList = side => evs.filter(e => e.type === 'goal' && e.side === side)
+      .map(e => side === 'us' ? `${esc(pname(e.no))} ${e.min}'` : `${esc(e.player || '對手')} ${e.min}'`).join('<br>');
+    const usBadge = `<span class="badge"><img src="assets/logo-64.png" alt=""></span>`;
+    const opBadge = `<span class="badge">${esc(m.opponent.replace(/足球俱樂部|俱樂部/g, '').slice(0, 1))}</span>`;
+    const home = m.home;
+    const L = home ? { n: '鳥仕', b: usBadge, s: 'us' } : { n: m.opponent, b: opBadge, s: 'them' };
+    const R = home ? { n: m.opponent, b: opBadge, s: 'them' } : { n: '鳥仕', b: usBadge, s: 'us' };
+    const lsc = home ? sc.us : sc.them, rsc = home ? sc.them : sc.us;
+
+    const v = view(`${draftBanner()}
+      <a href="#/matches" class="back">← 賽程</a>
+      <section class="scoreboard">
+        <div class="meta"><span>D LEAGUE L3 · 第 ${m.round} 輪</span><span>·</span><span>${fmtDate(m.date, m.time)}</span></div>
+        <div class="sb">
+          <div class="team">${L.b}<b>${esc(L.n)}</b></div>
+          <div>${played ? `<div class="score">${lsc}<i>:</i>${rsc}</div><span class="ft">FULL TIME</span>` : '<div class="score vs">VS</div>'}</div>
+          <div class="team">${R.b}<b>${esc(R.n)}</b></div>
+        </div>
+        ${played ? `<div class="scorers"><div>${scorerList(L.s)}</div><div>${scorerList(R.s)}</div></div>` : ''}
+        <div class="links">
+          ${m.official ? `<a href="${m.official}" target="_blank" rel="noopener">官方紀錄 ↗</a>` : ''}
+          ${(m.videos || []).map(x => `<a href="${x.url}" target="_blank" rel="noopener">▶ ${x.half === 1 ? '上' : '下'}半場</a>`).join('')}
+          <a href="#/log/${m.id}">✎ 紀錄</a>
+        </div>
+      </section>
+      <nav class="tabs" role="tablist">${tabs.map(([k, t]) => `<button role="tab" data-tab="${k}" class="${k === tab ? 'on' : ''}">${t}</button>`).join('')}</nav>
+      <div class="panel" id="panel"></div>`);
+
+    const panel = v.querySelector('#panel');
+    const show = k => {
+      v.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === k));
+      panel.innerHTML = '';
+      panel.style.animation = 'none'; void panel.offsetWidth; panel.style.animation = '';
+      ({ sum: panelSummary, goals: panelGoals, data: panelData, review: panelReview })[k](panel, m, { evs, conceded, played, rv });
+      try { history.replaceState(null, '', `#/m/${m.id}${k === 'sum' ? '' : '/' + k}`); } catch {}
+    };
+    v.querySelectorAll('.tabs button').forEach(b => b.onclick = () => show(b.dataset.tab));
+    show(tab);
+  }
+
+  function panelSummary(panel, m, { evs, played, rv }) {
+    let us = 0, them = 0, halfShown = false;
+    const hl = halfLen(m);
+    const row = e => {
+      let pre = '';
+      if (!halfShown && e.min > hl) { halfShown = true; pre = `<li><span class="half">HT ${us}–${them}</span></li>`; }
       if (e.type === 'goal') { if (e.side === 'us') us++; else them++; }
       const link = ytLink(m, e.video);
-      const who = e.type === 'goal'
-        ? (e.side === 'us' ? `⚽ ${esc(pLabel(e.no))}${e.assist ? `<span class="muted small">　助攻 ${esc(pname(e.assist))}</span>` : ''}` : `失球　${esc(e.player || '')}${e.no ? `（${esc(e.no)}）` : ''}`)
-        : e.type === 'sub' ? `🔁 ${esc(pname(e.on))} 上，${esc(pname(e.off))} 下`
-        : e.type === 'card' ? `${e.color === 'red' ? '🟥' : '🟨'} ${e.side === 'us' ? esc(pLabel(e.no)) : '對手 ' + esc(e.player || e.no || '')}`
-        : esc(e.note || '');
-      return `<li class="ev ev-${e.type} ${e.side || ''}">
-        <span class="min">${e.min}'</span>
-        <span class="what">${who}${e.type === 'goal' ? `<span class="score">${played ? `${us}-${them}` : ''}</span>` : ''}</span>
-        ${link ? `<a class="vid" href="${link}" target="_blank" rel="noopener" title="看影片">▶</a>` : ''}
-      </li>`;
+      const vid = link ? `<a class="vid" href="${link}" target="_blank" rel="noopener" title="影片">${ICON.play}</a>` : '';
+      const mine = e.side === 'us' || e.type === 'sub' || (e.type === 'card' && e.side === 'us');
+      let body;
+      if (e.type === 'goal') body = `${ICON.goal}<span>${esc(e.side === 'us' ? pname(e.no) : (e.player || '對手'))}${e.assist ? `<span class="muted small"> · ${esc(pname(e.assist))}</span>` : ''}</span><span class="sc">${m.home ? `${us}–${them}` : `${them}–${us}`}</span>`;
+      else if (e.type === 'sub') body = `${ICON.sub}<span>${esc(pname(e.on))} <span class="muted small">↔ ${esc(pname(e.off))}</span></span>`;
+      else if (e.type === 'card') body = `${ICON.card(e.color)}<span>${esc(e.side === 'us' ? pname(e.no) : (e.player || e.no || '對手'))}</span>`;
+      else body = esc(e.note || '');
+      const left = m.home ? mine : !mine;
+      const cls = e.type === 'goal' ? `goal-${e.side}` : '';
+      return pre + `<li class="${cls}">${left ? `<span class="ev-l">${vid}${body}</span>` : '<span></span>'}<span class="m">${e.min}'</span>${left ? '<span></span>' : `<span class="ev-r">${body}${vid}</span>`}</li>`;
     };
+    panel.innerHTML = `
+      ${rv.summary ? `<section class="card">${head('Summary', '比賽概要')}<p style="margin:0">${esc(rv.summary)}</p></section>` : ''}
+      ${played ? `<section class="card">${head('Timeline', '比賽事件', `<span class="legend"><span>${m.home ? '鳥仕' : esc(m.opponent)}</span><span>|</span><span>${m.home ? esc(m.opponent) : '鳥仕'}</span></span>`)}
+        ${evs.length ? `<ol class="tl">${evs.map(row).join('')}<li><span class="half">FT ${m.home ? `${us}–${them}` : `${them}–${us}`}</span></li></ol>` : '<p class="empty">尚無事件</p>'}
+      </section>` : `<section class="card">${head('Preview', '賽前')}<p class="empty">${m.home ? '主場' : '客場'} · ${fmtDate(m.date, m.time)}</p><a class="btn" href="#/log/${m.id}">開始紀錄</a></section>`}`;
+  }
 
-    app.innerHTML = `${draftBanner()}
-      <p><a href="#/matches" class="back">← 全部比賽</a></p>
-      <section class="match-head">
-        <p class="eyebrow">第 ${m.round} 輪 · ${fmtDate(m.date, m.time)} · ${m.home ? '主場' : '客場'}</p>
-        <div class="sb">
-          <span class="tm">鳥仕</span>
-          <span class="sc">${played ? `${sc.us} <i>-</i> ${sc.them}` : 'VS'}</span>
-          <span class="tm">${esc(m.opponent)}</span>
-        </div>
-        <p class="links">
-          ${m.official ? `<a href="${m.official}" target="_blank" rel="noopener">官方紀錄</a>` : ''}
-          ${(m.videos || []).map(v => `<a href="${v.url}" target="_blank" rel="noopener">${v.half === 1 ? '上' : '下'}半場影片</a>`).join('')}
-          <a href="#/log/${m.id}">編輯紀錄</a>
-        </p>
-      </section>
+  function panelGoals(panel, m, { conceded }) {
+    const op = onPitch(m);
+    let us = 0, them = 0;
+    const state = new Map();
+    sortEvents(m.events).forEach(e => { if (e.type !== 'goal') return; if (e.side === 'us') us++; else { them++; state.set(e, `${us}–${them}`); } });
+    panel.innerHTML = `<div class="goals">${conceded.map((e, i) => {
+      const link = ytLink(m, e.video);
+      const onList = op && op.perEvent.get(e);
+      const hasD = e.diagram && e.diagram.frames && e.diagram.frames.length;
+      return `<article class="goal" style="--i:${i}">
+        <header><span class="gm">${e.min}'</span><div><b>${esc(e.player || '對手')}${e.no ? ` <span class="muted">#${esc(e.no)}</span>` : ''}</b><div class="gs">鳥仕 ${state.get(e)}</div></div>
+          ${link ? `<a class="vid" href="${link}" target="_blank" rel="noopener">${ICON.play} ${esc(e.video.t)}</a>` : ''}</header>
+        <div class="tags">${(e.cause || []).map(c => `<span class="pill">${esc(c)}</span>`).join('')}${e.tentative ? '<span class="pill warn">初判</span>' : ''}${!(e.cause || []).length ? '<span class="pill">未標記</span>' : ''}</div>
+        ${e.note ? `<p class="note">${esc(e.note)}</p>` : ''}
+        ${onList ? `<p class="on">在場：${onList.map(n => esc(pname(n))).join('、')}</p>` : ''}
+        ${hasD ? `<div data-diagram="${i}"></div>` : `<a class="btn small ghost" href="#/log/${m.id}">＋ 站位圖</a>`}
+      </article>`;
+    }).join('')}</div>`;
+    panel.querySelectorAll('[data-diagram]').forEach(box => mountViewer(box, conceded[+box.dataset.diagram].diagram));
+  }
 
-      ${rv.summary ? `<section class="card"><h2>比賽概要</h2><p>${esc(rv.summary)}</p></section>` : ''}
-
-      ${played ? `<section class="card"><h2>比賽事件</h2>
-        ${evs.length ? `<ol class="timeline">${evs.map(evRow).join('')}</ol>` : '<p class="muted">尚未紀錄事件</p>'}
-      </section>` : `<section class="card"><h2>賽前準備</h2><p class="muted">比賽當天可以用「<a href="#/log/${m.id}">紀錄</a>」頁在場邊記錄先發、換人和進失球。</p></section>`}
-
-      ${conceded.length ? `<section class="card"><h2>失球分析</h2>
-        <p class="muted small">每個失球的原因、當時場上的鳥仕球員，以及 2D 站位圖。</p>
-        <div class="goals">${conceded.map((e, i) => goalCard(m, e, i, op)).join('')}</div>
-      </section>` : ''}
-
-      ${m.lineup && m.lineup.starters && m.lineup.starters.length ? `<section class="card"><h2>先發陣容</h2><div class="diagram" id="xi"></div></section>` : ''}
-      ${op ? lineupBlock(m, op) : played ? `<section class="card"><h2>出場與在場進失球</h2><p class="muted">${m.lineup ? '本場有先發名單，但沒有換人時間' : '本場沒有先發和換人紀錄'}，所以算不出每位球員在場時的進失球。</p></section>` : ''}
-
-      ${psBlock(m)}
-      ${listBlock('影片觀察', rv.observations, o => `<li><span class="muted small">${esc(o.video)} · ${esc(o.min)}</span><br>${esc(o.text)}</li>`)}
-      ${listBlock('做得好的', rv.good, o => `<li><strong>${esc(o.title)}</strong>：${esc(o.text)}</li>`)}
-      ${listBlock('需要改進的', rv.improve, o => `<li><strong>${esc(o.title)}</strong>：${esc(o.text)}</li>`)}
-      ${listBlock('下一場的準備', rv.plan, o => `<li><strong>${esc(o.title)}</strong>：${esc(o.text)}</li>`, 'ol')}
-      ${rv.pending ? `<p class="muted small">待補：${esc(rv.pending)}</p>` : ''}
-    `;
-    const xi = document.getElementById('xi');
+  function panelData(panel, m) {
+    const op = onPitch(m);
+    panel.innerHTML = `<div class="grid">
+      ${m.lineup && m.lineup.starters && m.lineup.starters.length ? `<section class="card c5">${head('Starting XI', '先發', esc(m.lineup.shape || '3-2-1'))}<div id="xi"></div></section>` : ''}
+      <div class="c7" style="display:grid;gap:16px;align-content:start">
+        ${op ? lineupBlock(m, op) : `<section class="card">${head('On pitch', '在場進失球')}<p class="empty">缺換人時間</p></section>`}
+        ${psBlock(m) || `<section class="card">${head('Passing', '傳球與攔截')}<p class="empty">尚無紀錄</p></section>`}
+      </div></div>`;
+    const xi = panel.querySelector('#xi');
     if (xi) {
       const base = Pitch.shape321();
       const us = m.lineup.starters.slice(0, 7).map((n, i) => ({ ...base[i], no: n, name: pname(n), label: pname(n) }));
       Pitch.render(xi, { us, them: [], arrows: [] }, { label: '先發陣容' });
+      xi.firstElementChild.classList.add('pitch-xi');
+      xi.classList.add('pitch-wrap');
     }
-    // 站位圖
-    app.querySelectorAll('[data-diagram]').forEach(box => {
-      const e = conceded[+box.dataset.diagram];
-      mountViewer(box, e.diagram);
-    });
-    bindCommon();
+  }
+
+  function panelReview(panel, m, { rv }) {
+    const li = (arr, cls) => `<ul class="rv-list ${cls}">${arr.map(o => `<li><b>${esc(o.title)}</b><span>${esc(o.text)}</span></li>`).join('')}</ul>`;
+    panel.innerHTML = `<div class="rv">
+      ${rv.good && rv.good.length ? `<section class="card c6">${head('Strengths', '做得好')}${li(rv.good, 'good')}</section>` : ''}
+      ${rv.improve && rv.improve.length ? `<section class="card c6">${head('Weaknesses', '待改進')}${li(rv.improve, 'bad')}</section>` : ''}
+      ${rv.plan && rv.plan.length ? `<section class="card c12">${head('Action plan', '下一場準備')}${li(rv.plan, 'plan')}</section>` : ''}
+      ${rv.observations && rv.observations.length ? `<section class="card c12">${head('Video notes', '影片觀察')}<ul class="obs">${rv.observations.map(o => `<li><span class="when">${esc(o.min)}<small>${esc(o.video)}</small></span><span>${esc(o.text)}</span></li>`).join('')}</ul></section>` : ''}
+    </div>`;
   }
 
   function psBlock(m) {
@@ -375,103 +468,106 @@
       .sort((a, b) => (b.ok + b.bad) - (a.ok + a.bad) || b.int - a.int);
     const tot = rows.reduce((t, r) => ({ ok: t.ok + r.ok, bad: t.bad + r.bad, int: t.int + r.int }), { ok: 0, bad: 0, int: 0 });
     const pct = (ok, bad) => ok + bad ? Math.round(ok / (ok + bad) * 100) + '%' : '–';
-    return `<section class="card"><h2>傳球與攔截</h2>
-      <div class="scroll"><table class="tbl-std"><thead><tr><th>球員</th><th>傳球</th><th>成功</th><th>成功率</th><th>攔截</th></tr></thead><tbody>
-      ${rows.map(r => `<tr><td>${esc(pLabel(r.n))}</td><td>${r.ok + r.bad}</td><td>${r.ok}</td><td>${pct(r.ok, r.bad)}</td><td>${r.int}</td></tr>`).join('')}
-      <tr><td><b>全隊</b></td><td><b>${tot.ok + tot.bad}</b></td><td><b>${tot.ok}</b></td><td><b>${pct(tot.ok, tot.bad)}</b></td><td><b>${tot.int}</b></td></tr>
+    return `<section class="card">${head('Passing', '傳球與攔截')}
+      <div class="scroll"><table class="t"><thead><tr><th>球員</th><th class="n">傳球</th><th class="n">成功</th><th class="n">成功率</th><th class="n">攔截</th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td>${esc(pname(r.n))} <span class="muted small">${esc(r.n)}</span></td><td class="n">${r.ok + r.bad}</td><td class="n">${r.ok}</td><td class="n">${pct(r.ok, r.bad)}</td><td class="n">${r.int}</td></tr>`).join('')}
+      <tr class="total"><td>全隊</td><td class="n">${tot.ok + tot.bad}</td><td class="n">${tot.ok}</td><td class="n">${pct(tot.ok, tot.bad)}</td><td class="n">${tot.int}</td></tr>
       </tbody></table></div></section>`;
   }
 
-  function listBlock(title, arr, fn, tag = 'ul') {
-    if (!arr || !arr.length) return '';
-    return `<section class="card"><h2>${title}</h2><${tag} class="plain">${arr.map(fn).join('')}</${tag}></section>`;
-  }
-
-  function goalCard(m, e, i, op) {
-    const link = ytLink(m, e.video);
-    const onList = op && op.perEvent.get(e);
-    const hasD = e.diagram && e.diagram.frames && e.diagram.frames.length;
-    return `<article class="goal">
-      <header><span class="min">${e.min}'</span><strong>${esc(e.player || '對手')}${e.no ? `（${esc(e.no)}）` : ''}</strong>
-        ${e.tentative ? '<span class="tag warn">初判</span>' : ''}
-        ${link ? `<a class="vid" href="${link}" target="_blank" rel="noopener">▶ 影片 ${esc(e.video.t)}</a>` : ''}</header>
-      <p class="tags">${(e.cause || []).map(c => `<span class="tag">${esc(c)}</span>`).join('') || '<span class="muted small">尚未標記原因</span>'}</p>
-      ${e.note ? `<p>${esc(e.note)}</p>` : ''}
-      ${onList ? `<p class="small"><span class="muted">當時在場：</span>${onList.map(n => esc(pname(n))).join('、')}</p>` : ''}
-      ${hasD ? `<div class="diagram" data-diagram="${i}"></div>` : `<p class="muted small">還沒有站位圖。<a href="#/log/${m.id}">去畫一張</a></p>`}
-    </article>`;
+  function lineupBlock(m, op) {
+    const rows = [...op.apps].map(n => ({ n, mins: op.mins[n] || 0, gf: op.gf[n] || 0, ga: op.ga[n] || 0, starter: m.lineup.starters.map(String).includes(n) }))
+      .sort((a, b) => b.mins - a.mins);
+    return `<section class="card">${head('On pitch', '在場進失球')}
+      <div class="scroll"><table class="t"><thead><tr><th>球員</th><th class="n">分鐘</th><th class="n">在場進</th><th class="n">在場失</th><th class="n">+/−</th></tr></thead><tbody>
+      ${rows.map(r => { const pm = r.gf - r.ga; return `<tr><td>${esc(pname(r.n))} ${r.starter ? '' : '<span class="pill">替補</span>'}</td><td class="n">${r.mins}</td><td class="n">${r.gf}</td><td class="n">${r.ga}</td><td class="n ${pm > 0 ? 'pos' : pm < 0 ? 'neg' : ''}">${pm > 0 ? '+' : ''}${pm}</td></tr>`; }).join('')}
+      </tbody></table></div></section>`;
   }
 
   function mountViewer(box, diagram) {
     let idx = 0;
     const frames = diagram.frames;
     const draw = () => {
-      box.innerHTML = `${frames.length > 1 ? `<div class="pe-frames">${frames.map((f, i) => `<button type="button" class="chip ${i === idx ? 'on' : ''}" data-i="${i}">${i + 1}. ${esc(f.label || '畫面')}</button>`).join('')}</div>` : `<p class="small muted">${esc(frames[0].label || '')}</p>`}
+      box.innerHTML = `${frames.length > 1 ? `<div class="frames">${frames.map((f, i) => `<button type="button" class="chip ${i === idx ? 'on' : ''}" data-i="${i}">${i + 1} · ${esc(f.label || '')}</button>`).join('')}</div>` : (frames[0].label ? `<div class="frames"><span class="chip on">${esc(frames[0].label)}</span></div>` : '')}
         <div class="pitch-wrap"></div>
-        ${diagram.note ? `<p class="small">${esc(diagram.note)}</p>` : ''}
-        ${legendPitch()}`;
+        ${legendPitch()}
+        ${diagram.note ? `<p class="board-note">${esc(diagram.note)}</p>` : ''}`;
       Pitch.render(box.querySelector('.pitch-wrap'), frames[idx], { label: frames[idx].label });
       box.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { idx = +b.dataset.i; draw(); });
     };
     draw();
   }
 
-  const legendPitch = () => `<div class="plegend small">
+  const legendPitch = () => `<div class="plegend">
     <span><i class="tk us"></i>鳥仕</span><span><i class="tk them"></i>對手</span>
     <span><i class="ln pass"></i>傳球</span><span><i class="ln run"></i>跑位</span><span><i class="ln dribble"></i>帶球</span><span><i class="ln shot"></i>射門</span></div>`;
 
-  function lineupBlock(m, op) {
-    const rows = [...op.apps].map(n => ({ n, mins: op.mins[n] || 0, gf: op.gf[n] || 0, ga: op.ga[n] || 0, starter: m.lineup.starters.map(String).includes(n) }))
-      .sort((a, b) => b.mins - a.mins);
-    return `<section class="card"><h2>出場與在場進失球</h2>
-      <table class="tbl-std"><thead><tr><th>球員</th><th>分鐘</th><th>在場進</th><th>在場失</th><th>+/−</th></tr></thead><tbody>
-      ${rows.map(r => `<tr><td>${esc(pLabel(r.n))}${r.starter ? '' : ' <span class="muted small">替補</span>'}</td><td>${r.mins}</td><td>${r.gf}</td><td>${r.ga}</td><td class="${r.gf - r.ga > 0 ? 'pos' : r.gf - r.ga < 0 ? 'neg' : ''}">${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td></tr>`).join('')}
-      </tbody></table></section>`;
-  }
-
-  // ---------- 頁面：球員 ----------
+  // ---------- 球員 ----------
+  let pSort = { k: 'mins', asc: false };
   function pagePlayers() {
-    nav('#/players');
+    nav('players');
     const s = seasonStats(matches());
     const rows = D.team.players.map(p => {
       const st = s.players[String(p.no)] || { apps: 0, mins: 0, gf: 0, ga: 0 };
-      return { ...p, ...st, goals: s.scorers[p.no] || 0, ast: s.assists[p.no] || 0, ps: s.ps[String(p.no)] };
-    }).sort((a, b) => (b.mins - a.mins) || (b.goals - a.goals) || ((b.ps ? b.ps.ok + b.ps.bad + b.ps.int : 0) - (a.ps ? a.ps.ok + a.ps.bad + a.ps.int : 0)) || (a.no - b.no));
-    app.innerHTML = `${draftBanner()}
+      const ps = s.ps[String(p.no)];
+      const passes = ps ? ps.ok + ps.bad : 0;
+      return { ...p, ...st, goals: s.scorers[p.no] || 0, ast: s.assists[p.no] || 0, passes, acc: passes ? ps.ok / passes : -1, int: ps ? ps.int : 0, pm: st.gf - st.ga };
+    });
+    const cols = [
+      ['no', '#'], ['name', '球員'], ['goals', '進球'], ['ast', '助攻'], ['passes', '傳球'], ['acc', '成功率'], ['int', '攔截'],
+      ['apps', '出場'], ['mins', '分鐘'], ['gf', '在場進'], ['ga', '在場失'], ['pm', '+/−']
+    ];
+    const render = () => {
+      const { k, asc } = pSort;
+      const sorted = [...rows].sort((a, b) => {
+        const x = a[k], y = b[k];
+        const c = typeof x === 'string' ? x.localeCompare(y, 'zh-Hant') : (x - y);
+        return (asc ? c : -c) || (b.goals - a.goals) || (a.no - b.no);
+      });
+      const cell = (r, c) => {
+        const v = r[c];
+        if (c === 'no') return `<td class="num" style="color:var(--gold);font-weight:700">${v}</td>`;
+        if (c === 'name') return `<td>${esc(v)}${r.pos ? `<span class="sub">${esc(r.pos)}</span>` : ''}</td>`;
+        if (c === 'acc') return `<td class="n">${v >= 0 ? Math.round(v * 100) + '%' : '<span class="muted">–</span>'}</td>`;
+        if (['gf', 'ga', 'pm', 'mins', 'apps'].includes(c) && !r.apps) return `<td class="n muted">–</td>`;
+        if (c === 'pm') return `<td class="n ${v > 0 ? 'pos' : v < 0 ? 'neg' : ''}">${v > 0 ? '+' : ''}${v}</td>`;
+        return `<td class="n">${v || '<span class="muted">0</span>'}</td>`;
+      };
+      tbl.innerHTML = `<thead><tr>${cols.map(([c, t]) => `<th class="sort ${['no', 'name'].includes(c) ? '' : 'n'} ${k === c ? 'on' + (asc ? ' asc' : '') : ''}" data-k="${c}">${t}</th>`).join('')}</tr></thead>
+        <tbody>${sorted.map(r => `<tr>${cols.map(([c]) => cell(r, c)).join('')}</tr>`).join('')}</tbody>`;
+      tbl.querySelectorAll('th.sort').forEach(th => th.onclick = () => {
+        const c = th.dataset.k;
+        pSort = pSort.k === c ? { k: c, asc: !pSort.asc } : { k: c, asc: c === 'name' || c === 'no' };
+        render();
+      });
+    };
+    const v = view(`${draftBanner()}
       <section class="card">
-        <h2>球員數據</h2>
-        <p class="muted small">進球來自官方紀錄。傳球與攔截來自「紀錄」頁的計數（目前 ${s.psMatches} 場）。出場、分鐘和在場進失球（+/−）只算有先發與換人紀錄的比賽（目前 ${s.lineupMatches} 場）。</p>
-        <div class="scroll"><table class="tbl-std players"><thead><tr>
-          <th>#</th><th>球員</th><th>進球</th><th>助攻</th><th>傳球</th><th>成功率</th><th>攔截</th><th>出場</th><th>分鐘</th><th>在場進</th><th>在場失</th><th>+/−</th><th>每 40 分失球</th>
-        </tr></thead><tbody>
-        ${rows.map(r => {
-          const pm = r.gf - r.ga;
-          return `<tr><td>${r.no}</td><td>${esc(r.name)}${r.pos ? `<br><span class="muted small">${esc(r.pos)}</span>` : ''}</td><td>${r.goals || ''}</td><td>${r.ast || ''}</td><td>${r.ps ? r.ps.ok + r.ps.bad : ''}</td><td>${r.ps && r.ps.ok + r.ps.bad ? Math.round(r.ps.ok / (r.ps.ok + r.ps.bad) * 100) + '%' : ''}</td><td>${r.ps ? r.ps.int : ''}</td><td>${r.apps || ''}</td><td>${r.mins || ''}</td><td>${r.apps ? r.gf : ''}</td><td>${r.apps ? r.ga : ''}</td>
-            <td class="${pm > 0 ? 'pos' : pm < 0 ? 'neg' : ''}">${r.apps ? (pm > 0 ? '+' : '') + pm : ''}</td>
-            <td>${r.mins >= 40 ? (r.ga / r.mins * 40).toFixed(1) : ''}</td></tr>`;
-        }).join('')}
-        </tbody></table></div>
+        ${head('Squad 2026/27', '球員數據', `${D.team.players.length} 人`)}
+        <div class="scroll"><table class="t sticky" id="ptbl"></table></div>
+        <p class="small muted" style="margin:12px 0 0">出場／分鐘／在場進失：${s.lineupMatches} 場有完整換人紀錄 · 傳球／攔截：${s.psMatches} 場</p>
       </section>
-      <section class="card"><h2>職員</h2><p>${D.team.staff.map(s => `${esc(s.role)}：${esc(s.name)}`).join('　')}</p>
-      <p class="small"><a href="${D.team.links.team}" target="_blank" rel="noopener">官網球隊頁</a></p></section>`;
-    bindCommon();
+      <section class="card">${head('Staff', '職員')}
+        <div style="display:flex;gap:24px;flex-wrap:wrap">${D.team.staff.map(x => `<div><span class="kicker">${esc(x.role)}</span><b>${esc(x.name)}</b></div>`).join('')}</div>
+      </section>`);
+    const tbl = v.querySelector('#ptbl');
+    render();
   }
 
-  // ---------- 頁面：戰術板 ----------
+  // ---------- 戰術板 ----------
   function pageBoard() {
-    nav('#/board');
+    nav('board');
     const SCRATCH = 'niaoshi-board-scratch';
     let scratch = null;
     try { scratch = JSON.parse(store.get(SCRATCH) || 'null'); } catch {}
     if (!scratch) scratch = { frames: [Pitch.blankFrame()] };
-    app.innerHTML = `
-      ${D.boards.map((b, i) => `<section class="card"><h2>${esc(b.title)}</h2><div class="diagram" data-board="${i}"></div></section>`).join('')}
-      <section class="card"><h2>自由戰術板</h2>
-        <p class="muted small">自己排站位、畫跑位。只存在這台裝置上。</p>
-        <div id="scratch"></div>
-        <p><button class="btn small" id="scratch-reset">清空重來</button></p>
-      </section>`;
-    app.querySelectorAll('[data-board]').forEach(box => mountViewer(box, D.boards[+box.dataset.board]));
+    const v = view(`<div class="grid">
+      ${D.boards.map((b, i) => `<section class="card c6">${head(i === 0 ? 'Shape' : 'Game management', esc(b.title))}<div data-board="${i}"></div></section>`).join('')}
+      </div>
+      <section class="card">${head('Whiteboard', '自由戰術板', '<button class="btn small ghost" id="scratch-reset">清空</button>')}
+        <div id="scratch" style="max-width:520px;margin:0 auto"></div>
+      </section>`);
+    v.querySelectorAll('[data-board]').forEach(box => mountViewer(box, D.boards[+box.dataset.board]));
     const mount = () => Pitch.editor(document.getElementById('scratch'), scratch, { onChange: d => store.set(SCRATCH, JSON.stringify(d)), nameOf: pname });
     mount();
     document.getElementById('scratch-reset').onclick = () => { scratch = { frames: [Pitch.blankFrame()] }; store.del(SCRATCH); mount(); };
@@ -487,7 +583,7 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => store.set(DRAFT_KEY, JSON.stringify(D.draft)), 200);
     const st = document.getElementById('save-state');
-    if (st) st.textContent = '已存在這台裝置（' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) + '）';
+    if (st) { st.textContent = '已存 ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }); st.classList.add('ok'); }
   }
 
   const clock = { start: null, half: 1, timer: null };
@@ -497,94 +593,89 @@
     return Math.min(halfLen(m) * (clock.half === 1 ? 1 : 2) + 5, Math.floor(el) + 1 + (clock.half === 2 ? halfLen(m) : 0));
   }
 
+
   function pageLog(id) {
-    nav('#/log');
+    nav('log');
     const list = ensureDraft();
     let m = list.find(x => x.id === id) || list.find(x => x.status !== 'played') || list[0];
     if (!m.events) m.events = [];
     const players = D.team.players;
     const repo = repoInfo();
+    const optsPlayers = sel => `<option value="">—</option>${players.map(p => `<option value="${p.no}" ${String(sel) === String(p.no) ? 'selected' : ''}>${p.no} ${esc(p.name)}</option>`).join('')}`;
+    const starters = () => (m.lineup && m.lineup.starters || []).map(String);
 
-    const optsPlayers = (sel, blank = true) => `${blank ? '<option value="">—</option>' : ''}${players.map(p => `<option value="${p.no}" ${String(sel) === String(p.no) ? 'selected' : ''}>${p.no} ${esc(p.name)}</option>`).join('')}`;
-
-    app.innerHTML = `
+    const v = view(`
       <section class="card">
-        <h2>比賽紀錄</h2>
-        <p class="muted small">在場邊或看影片時記錄。資料先存在這台裝置；記完按最下面的「發佈」更新到網站。</p>
-        <label class="field">比賽
-          <select id="lg-match">${list.map(x => `<option value="${x.id}" ${x.id === m.id ? 'selected' : ''}>第 ${x.round} 輪 · ${esc(x.opponent)} · ${fmtDate(x.date)}${x.status === 'played' ? '（已賽）' : ''}</option>`).join('')}</select>
-        </label>
-        <p class="small" id="save-state">${store.get(DRAFT_KEY) ? '這台裝置有草稿' : ''}</p>
+        ${head('Match log', '比賽紀錄', `<span class="save" id="save-state">${store.get(DRAFT_KEY) ? '已存草稿' : ''}</span>`)}
+        <select id="lg-match" style="width:100%">${list.map(x => `<option value="${x.id}" ${x.id === m.id ? 'selected' : ''}>R${x.round} · ${esc(x.opponent)} · ${fmtDate(x.date)}${x.status === 'played' ? ' ✓' : ''}</option>`).join('')}</select>
       </section>
 
-      <section class="card">
-        <h2>場邊計時</h2>
-        <div class="clock"><span id="clk">${clock.start ? clockMinute(m) + "'" : "--'"}</span>
-          <button class="btn small" data-clk="1">上半場開始</button>
-          <button class="btn small" data-clk="2">下半場開始</button>
-          <button class="btn small ghost" data-clk="0">停止</button></div>
-        <p class="muted small">計時中新增事件會自動帶入分鐘。看影片補紀錄時不用計時，直接填分鐘。</p>
-      </section>
+      <div class="grid">
+        <section class="card c5">
+          ${head('Clock', '計時')}
+          <div class="clock ${clock.start ? 'run' : ''}" id="clkbox"><span class="t" id="clk">${clock.start ? clockMinute(m) + "'" : "0'"}</span>
+            <div class="seg"><button type="button" data-clk="1">上半場</button><button type="button" data-clk="2">下半場</button><button type="button" data-clk="0">停止</button></div></div>
+        </section>
+        <section class="card c7">
+          ${head('Starting XI', '先發', `<span id="lg-lineup-n" class="num">${starters().length}</span> 人`)}
+          <div class="pgrid">${players.map(p => `<label class="pchk"><input type="checkbox" value="${p.no}" ${starters().includes(String(p.no)) ? 'checked' : ''}><b>${p.no}</b>${esc(p.name)}</label>`).join('')}</div>
+          <label class="field" style="margin-top:12px">門將 <select id="lg-gk">${optsPlayers(m.lineup && m.lineup.gk)}</select></label>
+        </section>
+      </div>
 
       <section class="card">
-        <h2 id="lg-lineup-h">先發（${(m.lineup && m.lineup.starters || []).length} 人）</h2>
-        <div class="pgrid">${players.map(p => `<label class="pchk"><input type="checkbox" value="${p.no}" ${(m.lineup && m.lineup.starters || []).map(String).includes(String(p.no)) ? 'checked' : ''}><b>${p.no}</b> ${esc(p.name)}</label>`).join('')}</div>
-        <label class="field">門將 <select id="lg-gk">${optsPlayers(m.lineup && m.lineup.gk)}</select></label>
-      </section>
-
-      <section class="card">
-        <h2>傳球與攔截</h2>
-        <p class="muted small">看影片或場邊時，每次傳球或攔截就點一下對應的按鈕。點錯了，打開「修正」再點一次就會減 1。</p>
-        <label class="chip-chk"><input type="checkbox" id="ps-undo">修正（點一下減 1）</label>
-        <div id="ps-box"></div>
-      </section>
-
-      <section class="card">
-        <h2>新增事件</h2>
+        ${head('Add event', '新增事件')}
         <div class="seg" id="lg-type">
-          <button type="button" data-t="us">我方進球</button><button type="button" data-t="them">失球</button>
+          <button type="button" data-t="us">進球</button><button type="button" data-t="them">失球</button>
           <button type="button" data-t="sub">換人</button><button type="button" data-t="card">紅黃牌</button>
         </div>
-        <div class="form" id="lg-form"></div>
+        <div class="fgrid" id="lg-form"></div>
       </section>
 
       <section class="card">
-        <h2>事件（${m.events.length}）</h2>
-        <p class="lead" id="lg-score"></p>
+        ${head('Events', '事件', `<span class="num" id="lg-score" style="font-size:1.1rem"></span>`)}
         <div id="lg-events"></div>
       </section>
 
       <section class="card">
-        <h2>發佈到網站</h2>
-        <ol class="plain small">
-          <li>按「複製全部資料」。</li>
-          <li>打開 <a href="${repo.edit}" target="_blank" rel="noopener">GitHub 上的 data/matches.json</a>（要用有權限的帳號）。</li>
-          <li>全選刪掉原本內容，貼上，按「Commit changes」。約 1 分鐘後網站就更新。</li>
-        </ol>
-        <p><button class="btn" id="lg-copy">複製全部資料</button> <button class="btn ghost" id="lg-dl">下載 matches.json</button></p>
-        <p class="small muted">也可以把下載的檔案傳給 Claude，請它幫你更新。</p>
-        <details><summary class="small">放棄草稿</summary><p><button class="btn small danger" id="lg-discard">刪除這台裝置的草稿，回到網站上的正式資料</button></p></details>
-      </section>`;
+        ${head('Passing', '傳球與攔截', '<label class="chip-chk toggle"><input type="checkbox" id="ps-undo">− 修正</label>')}
+        <div id="ps-box"></div>
+      </section>
 
-    // 比賽切換
+      <section class="card">
+        ${head('Publish', '發佈')}
+        <ol class="steps">
+          <li>複製資料</li>
+          <li>開啟&nbsp;<a href="${repo.edit}" target="_blank" rel="noopener">data/matches.json ↗</a></li>
+          <li>全部取代 → Commit changes</li>
+        </ol>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="lg-copy">複製資料</button><button class="btn ghost" id="lg-dl">下載 JSON</button><button class="btn small danger" id="lg-discard" style="margin-left:auto">捨棄草稿</button></div>
+      </section>`);
+
     document.getElementById('lg-match').onchange = e => { location.hash = '#/log/' + e.target.value; };
 
     // 計時
-    app.querySelectorAll('[data-clk]').forEach(b => b.onclick = () => {
-      const v = +b.dataset.clk;
+    const setClk = () => {
+      const c = document.getElementById('clk'); if (!c) return;
+      c.textContent = clock.start ? clockMinute(m) + "'" : "0'";
+      document.getElementById('clkbox').classList.toggle('run', !!clock.start);
+      v.querySelectorAll('[data-clk]').forEach(b => b.classList.toggle('on', clock.start ? +b.dataset.clk === clock.half : b.dataset.clk === '0'));
+    };
+    v.querySelectorAll('[data-clk]').forEach(b => b.onclick = () => {
+      const n = +b.dataset.clk;
       clearInterval(clock.timer);
-      if (!v) { clock.start = null; document.getElementById('clk').textContent = "--'"; return; }
-      clock.start = Date.now(); clock.half = v;
-      const tick = () => { const c = document.getElementById('clk'); if (c) c.textContent = clockMinute(m) + "'"; };
-      tick(); clock.timer = setInterval(tick, 5000);
+      if (!n) clock.start = null;
+      else { clock.start = Date.now(); clock.half = n; clock.timer = setInterval(setClk, 5000); }
+      setClk(); drawForm();
     });
+    setClk();
 
     // 先發
-    app.querySelectorAll('.pchk input').forEach(cb => cb.onchange = () => {
+    v.querySelectorAll('.pchk input').forEach(cb => cb.onchange = () => {
       m.lineup = m.lineup || { starters: [] };
-      m.lineup.starters = [...app.querySelectorAll('.pchk input:checked')].map(x => +x.value);
+      m.lineup.starters = [...v.querySelectorAll('.pchk input:checked')].map(x => +x.value);
       if (!m.lineup.starters.length && !m.lineup.gk) m.lineup = null;
-      document.getElementById('lg-lineup-h').textContent = `先發（${m.lineup ? m.lineup.starters.length : 0} 人）`;
+      document.getElementById('lg-lineup-n').textContent = m.lineup ? m.lineup.starters.length : 0;
       saveDraft(); renderEvents(); renderPS();
     });
     document.getElementById('lg-gk').onchange = e => {
@@ -593,34 +684,34 @@
       saveDraft();
     };
 
-    // 新增事件表單
+    // 新增事件
     let type = 'us';
     const form = document.getElementById('lg-form');
-    const drawForm = () => {
-      app.querySelectorAll('#lg-type button').forEach(b => b.classList.toggle('on', b.dataset.t === type));
-      const min = clockMinute(m) || '';
-      const minField = `<label class="field">分鐘 <input type="number" id="f-min" min="0" max="50" inputmode="numeric" value="${min}" required></label>`;
-      form.innerHTML = {
-        us: `${minField}<label class="field">進球 <select id="f-no">${optsPlayers('')}</select></label><label class="field">助攻 <select id="f-ast">${optsPlayers('')}</select></label>`,
-        them: `${minField}<label class="field">對手進球者 <input id="f-pl" placeholder="姓名（可留空）"></label><label class="field">背號 <input id="f-pno" inputmode="numeric" placeholder="可留空"></label>`,
-        sub: `${minField}<label class="field">上場 <select id="f-on">${optsPlayers('')}</select></label><label class="field">下場 <select id="f-off">${optsPlayers('')}</select></label>`,
-        card: `${minField}<label class="field">隊伍 <select id="f-side"><option value="us">鳥仕</option><option value="them">對手</option></select></label><label class="field">球員 <select id="f-cno">${optsPlayers('')}</select></label><label class="field">牌 <select id="f-col"><option value="yellow">黃牌</option><option value="red">紅牌</option></select></label>`
-      }[type] + `<button class="btn" id="f-add">新增</button>`;
+    function drawForm() {
+      v.querySelectorAll('#lg-type button').forEach(b => b.classList.toggle('on', b.dataset.t === type));
+      const minField = `<label class="field">分鐘<input type="number" id="f-min" min="0" max="50" inputmode="numeric" value="${clockMinute(m) || ''}"></label>`;
+      form.innerHTML = minField + {
+        us: `<label class="field">進球<select id="f-no">${optsPlayers('')}</select></label><label class="field">助攻<select id="f-ast">${optsPlayers('')}</select></label>`,
+        them: `<label class="field">對手球員<input id="f-pl" placeholder="姓名"></label><label class="field">背號<input id="f-pno" inputmode="numeric"></label>`,
+        sub: `<label class="field">上場<select id="f-on">${optsPlayers('')}</select></label><label class="field">下場<select id="f-off">${optsPlayers('')}</select></label>`,
+        card: `<label class="field">隊伍<select id="f-side"><option value="us">鳥仕</option><option value="them">對手</option></select></label><label class="field">球員<select id="f-cno">${optsPlayers('')}</select></label><label class="field">牌<select id="f-col"><option value="yellow">黃牌</option><option value="red">紅牌</option></select></label>`
+      }[type] + `<button class="btn" id="f-add">＋ 新增</button>`;
       document.getElementById('f-add').onclick = () => {
-        const min = +document.getElementById('f-min').value;
-        if (!document.getElementById('f-min').value) { document.getElementById('f-min').focus(); return; }
-        const v = s => (document.getElementById(s) || {}).value;
+        const mf = document.getElementById('f-min');
+        if (!mf.value) { mf.focus(); return; }
+        const min = +mf.value;
+        const val = s => (document.getElementById(s) || {}).value;
         let e;
-        if (type === 'us') e = { min, type: 'goal', side: 'us', no: v('f-no') ? +v('f-no') : null, ...(v('f-ast') ? { assist: +v('f-ast') } : {}) };
-        if (type === 'them') e = { min, type: 'goal', side: 'them', player: v('f-pl') || '', ...(v('f-pno') ? { no: v('f-pno') } : {}), cause: [] };
-        if (type === 'sub') { if (!v('f-on') || !v('f-off')) return; e = { min, type: 'sub', on: +v('f-on'), off: +v('f-off') };  if (m.lineup) delete m.lineup.subsKnown; }
-        if (type === 'card') e = { min, type: 'card', side: v('f-side'), no: v('f-cno') ? +v('f-cno') : null, color: v('f-col') };
+        if (type === 'us') e = { min, type: 'goal', side: 'us', no: val('f-no') ? +val('f-no') : null, ...(val('f-ast') ? { assist: +val('f-ast') } : {}) };
+        if (type === 'them') e = { min, type: 'goal', side: 'them', player: val('f-pl') || '', ...(val('f-pno') ? { no: val('f-pno') } : {}), cause: [] };
+        if (type === 'sub') { if (!val('f-on') || !val('f-off')) return; e = { min, type: 'sub', on: +val('f-on'), off: +val('f-off') }; if (m.lineup) delete m.lineup.subsKnown; }
+        if (type === 'card') e = { min, type: 'card', side: val('f-side'), no: val('f-cno') ? +val('f-cno') : null, color: val('f-col') };
         m.events.push(e);
         if (m.events.some(x => x.type === 'goal')) { m.status = 'played'; m.score = scoreOf(m); }
-        saveDraft(); drawForm(); renderEvents();
+        saveDraft(); drawForm(); renderEvents(); renderPS();
       };
-    };
-    app.querySelectorAll('#lg-type button').forEach(b => b.onclick = () => { type = b.dataset.t; drawForm(); });
+    }
+    v.querySelectorAll('#lg-type button').forEach(b => b.onclick = () => { type = b.dataset.t; drawForm(); });
     drawForm();
 
     // 事件列表
@@ -629,16 +720,16 @@
       const evs = sortEvents(m.events);
       const op = onPitch(m);
       const sc = scoreOf(m);
-      document.getElementById('lg-score').textContent = `目前比分　鳥仕 ${sc.us} - ${sc.them} ${m.opponent}`;
-      box.innerHTML = evs.length ? '' : '<p class="muted">還沒有事件</p>';
+      document.getElementById('lg-score').textContent = `${sc.us} : ${sc.them}`;
+      box.innerHTML = evs.length ? '' : '<p class="empty">尚無事件</p>';
       evs.forEach(e => {
         const card = document.createElement('div');
         card.className = 'lg-ev ' + (e.side || '') + ' ' + e.type;
-        const title = e.type === 'goal' ? (e.side === 'us' ? `⚽ ${pLabel(e.no)}` : `失球 ${e.player || ''}${e.no ? `（${e.no}）` : ''}`)
-          : e.type === 'sub' ? `🔁 ${pname(e.on)} 上 / ${pname(e.off)} 下`
-          : `${e.color === 'red' ? '🟥' : '🟨'} ${e.side === 'us' ? pLabel(e.no) : '對手'}`;
-        card.innerHTML = `<div class="row"><input type="number" class="ev-min" value="${e.min}" aria-label="分鐘">'<strong>${esc(title)}</strong>
-          <button class="btn small ghost danger ev-del" title="刪除">刪除</button></div>`;
+        const title = e.type === 'goal' ? (e.side === 'us' ? `進球 · ${pLabel(e.no)}` : `失球 · ${e.player || '對手'}${e.no ? ` #${e.no}` : ''}`)
+          : e.type === 'sub' ? `換人 · ${pname(e.on)} ↔ ${pname(e.off)}`
+          : `${e.color === 'red' ? '紅牌' : '黃牌'} · ${e.side === 'us' ? pLabel(e.no) : '對手'}`;
+        card.innerHTML = `<div class="row"><input type="number" class="ev-min" value="${e.min}" aria-label="分鐘"><strong>${esc(title)}</strong>
+          <button class="btn small ghost ev-del" aria-label="刪除">✕</button></div>`;
         card.querySelector('.ev-min').onchange = ev => { e.min = +ev.target.value; saveDraft(); renderEvents(); };
         card.querySelector('.ev-del').onclick = () => { if (confirm('刪除這個事件？')) { m.events.splice(m.events.indexOf(e), 1); m.score = scoreOf(m); saveDraft(); renderEvents(); } };
         if (e.type === 'goal') {
@@ -646,25 +737,24 @@
           extra.className = 'ev-extra';
           const onList = op && op.perEvent.get(e);
           extra.innerHTML = `
-            ${e.side === 'them' ? `<div class="causes">${CAUSES.map(c => `<label class="chip-chk"><input type="checkbox" value="${esc(c)}" ${(e.cause || []).includes(c) ? 'checked' : ''}>${esc(c)}</label>`).join('')}</div>
-              <label class="chip-chk"><input type="checkbox" class="ev-tent" ${e.tentative ? 'checked' : ''}>只是初判，還沒逐格確認</label>` : ''}
-            <label class="field">說明 <textarea class="ev-note" rows="2" placeholder="${e.side === 'them' ? '例：對方 7 號回接、我方中場沒跟，身後空檔被打穿' : '例：自家禁區斷球後 10 秒打到對方禁區'}">${esc(e.note || '')}</textarea></label>
-            <div class="row"><label class="field">影片 <select class="ev-vh"><option value="">—</option><option value="1" ${e.video && e.video.half === 1 ? 'selected' : ''}>上半場</option><option value="2" ${e.video && e.video.half === 2 ? 'selected' : ''}>下半場</option></select></label>
-            <label class="field">時間 <input class="ev-vt" placeholder="12:38" value="${esc(e.video ? e.video.t : '')}"></label></div>
-            ${onList ? `<p class="small muted">當時在場：${onList.map(pname).join('、')}</p>` : ''}
-            <button class="btn small ev-diag">${e.diagram ? '編輯站位圖' : '＋ 畫站位圖'}</button>
+            ${e.side === 'them' ? `<div class="causes">${CAUSES.map(c => `<label class="chip-chk"><input type="checkbox" value="${esc(c)}" ${(e.cause || []).includes(c) ? 'checked' : ''}>${esc(c)}</label>`).join('')}<label class="chip-chk toggle"><input type="checkbox" class="ev-tent" ${e.tentative ? 'checked' : ''}>初判</label></div>` : ''}
+            <textarea class="ev-note" rows="2" placeholder="備註">${esc(e.note || '')}</textarea>
+            <div class="fgrid" style="margin:0"><label class="field">影片<select class="ev-vh"><option value="">—</option><option value="1" ${e.video && e.video.half === 1 ? 'selected' : ''}>上半場</option><option value="2" ${e.video && e.video.half === 2 ? 'selected' : ''}>下半場</option></select></label>
+            <label class="field">時間<input class="ev-vt" placeholder="mm:ss" value="${esc(e.video ? e.video.t : '')}"></label>
+            <button class="btn small ${e.diagram ? '' : 'ghost'} ev-diag">${e.diagram ? '站位圖 ▾' : '＋ 站位圖'}</button></div>
+            ${onList ? `<p class="small muted" style="margin:0">在場：${onList.map(pname).join('、')}</p>` : ''}
             <div class="ev-diag-box"></div>`;
-          extra.querySelectorAll('.causes input').forEach(cb => cb.onchange = () => { e.cause = [...extra.querySelectorAll('.causes input:checked')].map(x => x.value); saveDraft(); });
+          extra.querySelectorAll('.causes input:not(.ev-tent)').forEach(cb => cb.onchange = () => { e.cause = [...extra.querySelectorAll('.causes input:not(.ev-tent):checked')].map(x => x.value); saveDraft(); });
           const tent = extra.querySelector('.ev-tent'); if (tent) tent.onchange = () => { if (tent.checked) e.tentative = true; else delete e.tentative; saveDraft(); };
           extra.querySelector('.ev-note').oninput = ev => { e.note = ev.target.value; saveDraft(); };
           const vh = extra.querySelector('.ev-vh'), vt = extra.querySelector('.ev-vt');
           const setV = () => { if (vh.value && vt.value) e.video = { half: +vh.value, t: vt.value.trim() }; else delete e.video; saveDraft(); };
           vh.onchange = setV; vt.oninput = setV;
-          extra.querySelector('.ev-diag').onclick = btn => {
+          extra.querySelector('.ev-diag').onclick = () => {
             const bx = extra.querySelector('.ev-diag-box');
             if (bx.childElementCount) { bx.innerHTML = ''; return; }
             if (!e.diagram) {
-              e.diagram = { frames: [Pitch.blankFrame(onList ? orderGK(onList, m) : [])] };
+              e.diagram = { frames: [Pitch.blankFrame(onList ? orderGK(onList, m) : (starters().length ? orderGK(starters(), m) : []))] };
               e.diagram.frames[0].us.forEach(p => { if (p.no !== '') p.name = pname(p.no); });
               saveDraft();
             }
@@ -672,7 +762,7 @@
             bx.appendChild(holder);
             Pitch.editor(holder, e.diagram, { onChange: () => saveDraft(), nameOf: pname });
             const rm = document.createElement('button');
-            rm.className = 'btn small ghost danger'; rm.textContent = '刪除整張站位圖';
+            rm.className = 'btn small danger'; rm.textContent = '刪除站位圖'; rm.style.marginTop = '10px';
             rm.onclick = () => { if (confirm('刪除這張站位圖？')) { delete e.diagram; saveDraft(); renderEvents(); } };
             bx.appendChild(rm);
           };
@@ -683,44 +773,48 @@
     }
     renderEvents();
 
-    // 傳球與攔截計數
+    // 傳球與攔截
     function renderPS() {
       const box = document.getElementById('ps-box');
       const ps = m.playerStats || {};
-      const inGame = new Set([...(m.lineup && m.lineup.starters || []), ...m.events.filter(e => e.type === 'sub').map(e => e.on)].map(String));
+      const inGame = new Set([...starters(), ...m.events.filter(e => e.type === 'sub').map(e => String(e.on))]);
       Object.keys(ps).forEach(n => inGame.add(n));
       const row = p => {
-        const v = ps[p.no] || {};
-        return `<div class="ps-row" data-no="${p.no}"><span class="ps-name"><b>${p.no}</b> ${esc(p.name)}</span>
-          <button type="button" class="ps-btn ok" data-k="ok">傳球成功<b>${v.ok || 0}</b></button>
-          <button type="button" class="ps-btn bad" data-k="bad">傳球失誤<b>${v.bad || 0}</b></button>
-          <button type="button" class="ps-btn int" data-k="int">攔截<b>${v.int || 0}</b></button></div>`;
+        const x = ps[p.no] || {};
+        return `<div class="ps-row" data-no="${p.no}"><span class="ps-name"><b>${p.no}</b>${esc(p.name)}</span>
+          <button type="button" class="ps-btn ok" data-k="ok">成功<b>${x.ok || 0}</b></button>
+          <button type="button" class="ps-btn bad" data-k="bad">失誤<b>${x.bad || 0}</b></button>
+          <button type="button" class="ps-btn int" data-k="int">攔截<b>${x.int || 0}</b></button></div>`;
       };
       const main = players.filter(p => inGame.has(String(p.no)));
       const rest = players.filter(p => !inGame.has(String(p.no)));
-      box.innerHTML = `${main.map(row).join('') || '<p class="muted small">先勾選先發，上場球員會排在這裡。</p>'}
-        ${rest.length ? `<details ${main.length ? '' : 'open'}><summary class="small">其他球員（${rest.length}）</summary>${rest.map(row).join('')}</details>` : ''}`;
+      box.innerHTML = `${main.map(row).join('')}
+        ${rest.length ? `<details class="more" ${main.length ? '' : 'open'}><summary>${main.length ? `其他球員 ${rest.length}` : '全部球員'}</summary>${rest.map(row).join('')}</details>` : ''}`;
       box.querySelectorAll('.ps-btn').forEach(b => b.onclick = () => {
         const no = b.closest('.ps-row').dataset.no, k = b.dataset.k;
         m.playerStats = m.playerStats || {};
-        const v = m.playerStats[no] = m.playerStats[no] || {};
+        const x = m.playerStats[no] = m.playerStats[no] || {};
         const undo = document.getElementById('ps-undo').checked;
-        v[k] = Math.max(0, (v[k] || 0) + (undo ? -1 : 1));
-        if (!v.ok && !v.bad && !v.int) delete m.playerStats[no];
+        x[k] = Math.max(0, (x[k] || 0) + (undo ? -1 : 1));
+        b.querySelector('b').textContent = x[k];
+        if (!x.ok && !x.bad && !x.int) delete m.playerStats[no];
         if (!Object.keys(m.playerStats).length) delete m.playerStats;
-        b.querySelector('b').textContent = v[k];
         b.classList.remove('pulse'); void b.offsetWidth; b.classList.add('pulse');
+        if (navigator.vibrate) try { navigator.vibrate(8); } catch {}
         saveDraft();
       });
     }
+    document.getElementById('ps-undo').onchange = e => document.getElementById('ps-box').classList.toggle('undo-on', e.target.checked);
     renderPS();
 
     // 發佈
     const json = () => JSON.stringify(list, null, 2) + '\n';
     document.getElementById('lg-copy').onclick = async ev => {
-      try { await navigator.clipboard.writeText(json()); ev.target.textContent = '已複製 ✓'; }
-      catch { const ta = document.createElement('textarea'); ta.value = json(); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); ev.target.textContent = '已複製 ✓'; }
-      setTimeout(() => ev.target.textContent = '複製全部資料', 2500);
+      const b = ev.currentTarget;
+      try { await navigator.clipboard.writeText(json()); }
+      catch { const ta = document.createElement('textarea'); ta.value = json(); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+      b.textContent = '已複製 ✓';
+      setTimeout(() => b.textContent = '複製資料', 2000);
     };
     document.getElementById('lg-dl').onclick = () => {
       const a = document.createElement('a');
@@ -728,7 +822,7 @@
       a.download = 'matches.json'; a.click();
     };
     document.getElementById('lg-discard').onclick = () => {
-      if (!confirm('確定刪除這台裝置上的草稿？')) return;
+      if (!confirm('捨棄本機草稿，回到網站上的資料？')) return;
       store.del(DRAFT_KEY); D.draft = null; store.sset(PREVIEW_KEY, '0'); route();
     };
   }
@@ -753,13 +847,15 @@
   }
 
   // ---------- 路由 ----------
+  let lastPage = null;
   function route() {
-    const hsh = location.hash || '#/';
-    const [, page, arg] = hsh.split('/');
-    window.scrollTo(0, 0);
+    const [, page, arg, sub] = (location.hash || '#/').split('/');
+    const key = (page || '') + '/' + (arg || '');
+    if (key !== lastPage) window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+    lastPage = key;
     if (!page) return pageHome();
     if (page === 'matches') return pageMatches();
-    if (page === 'm') return pageMatch(arg);
+    if (page === 'm') return pageMatch(arg, sub);
     if (page === 'players') return pagePlayers();
     if (page === 'board') return pageBoard();
     if (page === 'log') return pageLog(arg);
@@ -768,14 +864,14 @@
 
   async function boot() {
     try {
-      const v = '?v=' + Date.now().toString(36).slice(0, -3);
+      const v = '?v=' + Math.floor(Date.now() / 60000).toString(36);
       const [team, ms, boards] = await Promise.all(['data/team.json', 'data/matches.json', 'data/boards.json'].map(u => fetch(u + v).then(r => { if (!r.ok) throw new Error(u); return r.json(); })));
       D.team = team; D.published = ms; D.boards = boards;
       try { const d = store.get(DRAFT_KEY); if (d) D.draft = JSON.parse(d); } catch {}
       window.addEventListener('hashchange', route);
       route();
     } catch (err) {
-      app.innerHTML = `<p class="card">資料載入失敗（${esc(err.message)}）。請重新整理。</p>`;
+      app.innerHTML = `<p class="empty" style="text-align:center;padding:60px 0">資料載入失敗，請重新整理</p>`;
     }
   }
   boot();
