@@ -260,3 +260,14 @@ textarea { width: 100%; }
 .chip-chk:has(input:checked) { background: var(--them); border-color: var(--them); color: #fff; }
 .ev-diag-box:not(:empty) { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); }
 .foot { padding-bottom: 40px; }
+
+/* 傳球與攔截計數 */
+.ps-row { display: grid; grid-template-columns: 1fr repeat(3, minmax(64px, auto)); gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.ps-name { font-size: .9rem; }
+.ps-btn { font: inherit; font-size: .75rem; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 4px 6px; min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2); cursor: pointer; touch-action: manipulation; }
+.ps-btn b { font-size: 1.15rem; color: var(--text); font-variant-numeric: tabular-nums; }
+.ps-btn.ok { border-color: var(--us); }
+.ps-btn.int { border-color: var(--accent); }
+.ps-btn.pulse { animation: pulse .25s; }
+@keyframes pulse { from { transform: scale(.92); } to { transform: scale(1); } }
+@media (max-width: 420px) { .ps-row { grid-template-columns: 1fr 1fr 1fr; } .ps-name { grid-column: 1 / -1; } }

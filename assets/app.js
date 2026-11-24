@@ -84,7 +84,7 @@
 
   function seasonStats(list) {
     const played = list.filter(m => m.status === 'played');
-    const s = { played, w: 0, d: 0, l: 0, gf: 0, ga: 0, win: [[0, 0, 0, 0], [0, 0, 0, 0]], halves: { us: [0, 0], them: [0, 0] }, scorers: {}, assists: {}, causes: {}, causesTentative: {}, concededState: { lead: 0, draw: 0, trail: 0 }, conceded: [] , players: {}, lineupMatches: 0 };
+    const s = { played, w: 0, d: 0, l: 0, gf: 0, ga: 0, win: [[0, 0, 0, 0], [0, 0, 0, 0]], halves: { us: [0, 0], them: [0, 0] }, scorers: {}, assists: {}, causes: {}, causesTentative: {}, concededState: { lead: 0, draw: 0, trail: 0 }, conceded: [] , players: {}, lineupMatches: 0, ps: {}, psMatches: 0 };
     played.forEach(m => {
       const sc = scoreOf(m);
       s.gf += sc.us; s.ga += sc.them;
@@ -106,6 +106,13 @@
           them++;
         }
       });
+      if (m.playerStats && Object.keys(m.playerStats).length) {
+        s.psMatches++;
+        Object.entries(m.playerStats).forEach(([n, v]) => {
+          const t = s.ps[n] = s.ps[n] || { ok: 0, bad: 0, int: 0, games: 0 };
+          t.ok += v.ok || 0; t.bad += v.bad || 0; t.int += v.int || 0; t.games++;
+        });
+      }
       const op = onPitch(m);
       if (op) {
         s.lineupMatches++;
@@ -340,6 +347,7 @@
       ${m.lineup && m.lineup.starters && m.lineup.starters.length ? `<section class="card"><h2>先發陣容</h2><div class="diagram" id="xi"></div></section>` : ''}
       ${op ? lineupBlock(m, op) : played ? `<section class="card"><h2>出場與在場進失球</h2><p class="muted">${m.lineup ? '本場有先發名單，但沒有換人時間' : '本場沒有先發和換人紀錄'}，所以算不出每位球員在場時的進失球。</p></section>` : ''}
 
+      ${psBlock(m)}
       ${listBlock('影片觀察', rv.observations, o => `<li><span class="muted small">${esc(o.video)} · ${esc(o.min)}</span><br>${esc(o.text)}</li>`)}
       ${listBlock('做得好的', rv.good, o => `<li><strong>${esc(o.title)}</strong>：${esc(o.text)}</li>`)}
       ${listBlock('需要改進的', rv.improve, o => `<li><strong>${esc(o.title)}</strong>：${esc(o.text)}</li>`)}
@@ -358,6 +366,20 @@
       mountViewer(box, e.diagram);
     });
     bindCommon();
+  }
+
+  function psBlock(m) {
+    const ps = m.playerStats;
+    if (!ps || !Object.keys(ps).length) return '';
+    const rows = Object.entries(ps).map(([n, v]) => ({ n, ok: v.ok || 0, bad: v.bad || 0, int: v.int || 0 }))
+      .sort((a, b) => (b.ok + b.bad) - (a.ok + a.bad) || b.int - a.int);
+    const tot = rows.reduce((t, r) => ({ ok: t.ok + r.ok, bad: t.bad + r.bad, int: t.int + r.int }), { ok: 0, bad: 0, int: 0 });
+    const pct = (ok, bad) => ok + bad ? Math.round(ok / (ok + bad) * 100) + '%' : '–';
+    return `<section class="card"><h2>傳球與攔截</h2>
+      <div class="scroll"><table class="tbl-std"><thead><tr><th>球員</th><th>傳球</th><th>成功</th><th>成功率</th><th>攔截</th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td>${esc(pLabel(r.n))}</td><td>${r.ok + r.bad}</td><td>${r.ok}</td><td>${pct(r.ok, r.bad)}</td><td>${r.int}</td></tr>`).join('')}
+      <tr><td><b>全隊</b></td><td><b>${tot.ok + tot.bad}</b></td><td><b>${tot.ok}</b></td><td><b>${pct(tot.ok, tot.bad)}</b></td><td><b>${tot.int}</b></td></tr>
+      </tbody></table></div></section>`;
   }
 
   function listBlock(title, arr, fn, tag = 'ul') {
@@ -413,18 +435,18 @@
     const s = seasonStats(matches());
     const rows = D.team.players.map(p => {
       const st = s.players[String(p.no)] || { apps: 0, mins: 0, gf: 0, ga: 0 };
-      return { ...p, ...st, goals: s.scorers[p.no] || 0, ast: s.assists[p.no] || 0 };
-    }).sort((a, b) => (b.mins - a.mins) || (b.goals - a.goals) || (a.no - b.no));
+      return { ...p, ...st, goals: s.scorers[p.no] || 0, ast: s.assists[p.no] || 0, ps: s.ps[String(p.no)] };
+    }).sort((a, b) => (b.mins - a.mins) || (b.goals - a.goals) || ((b.ps ? b.ps.ok + b.ps.bad + b.ps.int : 0) - (a.ps ? a.ps.ok + a.ps.bad + a.ps.int : 0)) || (a.no - b.no));
     app.innerHTML = `${draftBanner()}
       <section class="card">
         <h2>球員數據</h2>
-        <p class="muted small">進球來自官方紀錄。出場、分鐘和在場進失球（+/−）只算有先發與換人紀錄的比賽（目前 ${s.lineupMatches} 場）。</p>
+        <p class="muted small">進球來自官方紀錄。傳球與攔截來自「紀錄」頁的計數（目前 ${s.psMatches} 場）。出場、分鐘和在場進失球（+/−）只算有先發與換人紀錄的比賽（目前 ${s.lineupMatches} 場）。</p>
         <div class="scroll"><table class="tbl-std players"><thead><tr>
-          <th>#</th><th>球員</th><th>進球</th><th>助攻</th><th>出場</th><th>分鐘</th><th>在場進</th><th>在場失</th><th>+/−</th><th>每 40 分失球</th>
+          <th>#</th><th>球員</th><th>進球</th><th>助攻</th><th>傳球</th><th>成功率</th><th>攔截</th><th>出場</th><th>分鐘</th><th>在場進</th><th>在場失</th><th>+/−</th><th>每 40 分失球</th>
         </tr></thead><tbody>
         ${rows.map(r => {
           const pm = r.gf - r.ga;
-          return `<tr><td>${r.no}</td><td>${esc(r.name)}</td><td>${r.goals || ''}</td><td>${r.ast || ''}</td><td>${r.apps || ''}</td><td>${r.mins || ''}</td><td>${r.apps ? r.gf : ''}</td><td>${r.apps ? r.ga : ''}</td>
+          return `<tr><td>${r.no}</td><td>${esc(r.name)}${r.pos ? `<br><span class="muted small">${esc(r.pos)}</span>` : ''}</td><td>${r.goals || ''}</td><td>${r.ast || ''}</td><td>${r.ps ? r.ps.ok + r.ps.bad : ''}</td><td>${r.ps && r.ps.ok + r.ps.bad ? Math.round(r.ps.ok / (r.ps.ok + r.ps.bad) * 100) + '%' : ''}</td><td>${r.ps ? r.ps.int : ''}</td><td>${r.apps || ''}</td><td>${r.mins || ''}</td><td>${r.apps ? r.gf : ''}</td><td>${r.apps ? r.ga : ''}</td>
             <td class="${pm > 0 ? 'pos' : pm < 0 ? 'neg' : ''}">${r.apps ? (pm > 0 ? '+' : '') + pm : ''}</td>
             <td>${r.mins >= 40 ? (r.ga / r.mins * 40).toFixed(1) : ''}</td></tr>`;
         }).join('')}
@@ -511,6 +533,13 @@
       </section>
 
       <section class="card">
+        <h2>傳球與攔截</h2>
+        <p class="muted small">看影片或場邊時，每次傳球或攔截就點一下對應的按鈕。點錯了，打開「修正」再點一次就會減 1。</p>
+        <label class="chip-chk"><input type="checkbox" id="ps-undo">修正（點一下減 1）</label>
+        <div id="ps-box"></div>
+      </section>
+
+      <section class="card">
         <h2>新增事件</h2>
         <div class="seg" id="lg-type">
           <button type="button" data-t="us">我方進球</button><button type="button" data-t="them">失球</button>
@@ -556,7 +585,7 @@
       m.lineup.starters = [...app.querySelectorAll('.pchk input:checked')].map(x => +x.value);
       if (!m.lineup.starters.length && !m.lineup.gk) m.lineup = null;
       document.getElementById('lg-lineup-h').textContent = `先發（${m.lineup ? m.lineup.starters.length : 0} 人）`;
-      saveDraft(); renderEvents();
+      saveDraft(); renderEvents(); renderPS();
     });
     document.getElementById('lg-gk').onchange = e => {
       m.lineup = m.lineup || { starters: [] };
@@ -653,6 +682,38 @@
       });
     }
     renderEvents();
+
+    // 傳球與攔截計數
+    function renderPS() {
+      const box = document.getElementById('ps-box');
+      const ps = m.playerStats || {};
+      const inGame = new Set([...(m.lineup && m.lineup.starters || []), ...m.events.filter(e => e.type === 'sub').map(e => e.on)].map(String));
+      Object.keys(ps).forEach(n => inGame.add(n));
+      const row = p => {
+        const v = ps[p.no] || {};
+        return `<div class="ps-row" data-no="${p.no}"><span class="ps-name"><b>${p.no}</b> ${esc(p.name)}</span>
+          <button type="button" class="ps-btn ok" data-k="ok">傳球成功<b>${v.ok || 0}</b></button>
+          <button type="button" class="ps-btn bad" data-k="bad">傳球失誤<b>${v.bad || 0}</b></button>
+          <button type="button" class="ps-btn int" data-k="int">攔截<b>${v.int || 0}</b></button></div>`;
+      };
+      const main = players.filter(p => inGame.has(String(p.no)));
+      const rest = players.filter(p => !inGame.has(String(p.no)));
+      box.innerHTML = `${main.map(row).join('') || '<p class="muted small">先勾選先發，上場球員會排在這裡。</p>'}
+        ${rest.length ? `<details ${main.length ? '' : 'open'}><summary class="small">其他球員（${rest.length}）</summary>${rest.map(row).join('')}</details>` : ''}`;
+      box.querySelectorAll('.ps-btn').forEach(b => b.onclick = () => {
+        const no = b.closest('.ps-row').dataset.no, k = b.dataset.k;
+        m.playerStats = m.playerStats || {};
+        const v = m.playerStats[no] = m.playerStats[no] || {};
+        const undo = document.getElementById('ps-undo').checked;
+        v[k] = Math.max(0, (v[k] || 0) + (undo ? -1 : 1));
+        if (!v.ok && !v.bad && !v.int) delete m.playerStats[no];
+        if (!Object.keys(m.playerStats).length) delete m.playerStats;
+        b.querySelector('b').textContent = v[k];
+        b.classList.remove('pulse'); void b.offsetWidth; b.classList.add('pulse');
+        saveDraft();
+      });
+    }
+    renderPS();
 
     // 發佈
     const json = () => JSON.stringify(list, null, 2) + '\n';
