@@ -1096,8 +1096,7 @@
   async function boot() {
     document.body.classList.toggle('editor', EDITOR);
     try {
-      const v = '?v=' + Math.floor(Date.now() / 60000).toString(36);
-      const [team, ms, boards] = await Promise.all(['data/team.json', 'data/matches.json', 'data/boards.json'].map(u => fetch(u + v).then(r => { if (!r.ok) throw new Error(u); return r.json(); })));
+      const [team, ms, boards] = await Promise.all(['data/team.json', 'data/matches.json', 'data/boards.json'].map(u => fetch(u, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(u); return r.json(); })));
       D.team = team; D.published = ms; D.boards = boards;
       loadDraft();
       window.addEventListener('hashchange', route);
